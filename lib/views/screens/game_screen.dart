@@ -8,14 +8,14 @@ class GameScreen extends StatelessWidget {
   const GameScreen({super.key});
 
   void _showWinnerDialog(BuildContext context, GameController controller) {
-    final winner = controller.match.winner;
+    final match = controller.match;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Pemain $winner Menang!'),
+        title: Text('${match.winnerName} Menang!'),
         content: Text(
-          'Skor akhir: ${controller.match.player1Score} - ${controller.match.player2Score}',
+          'Skor akhir: ${match.player1Score} - ${match.player2Score}',
         ),
         actions: [
           TextButton(
@@ -40,16 +40,9 @@ class GameScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // context.watch<T>() -> subscribe ke Controller. Setiap kali
-    // notifyListeners() dipanggil di Controller, build() ini
-    // dijalankan ulang otomatis dengan data terbaru.
     final controller = context.watch<GameController>();
     final match = controller.match;
 
-    // Begitu status berubah jadi finished, tampilkan dialog pemenang.
-    // addPostFrameCallback dipakai supaya showDialog tidak dipanggil
-    // di tengah proses build() (yang tidak diperbolehkan Flutter),
-    // melainkan tepat setelah frame ini selesai digambar.
     if (match.status == MatchStatus.finished) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) _showWinnerDialog(context, controller);
@@ -62,21 +55,36 @@ class GameScreen extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Text(
-                'Target skor: ${match.maxScore}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              child: Column(
+                children: [
+                  Text(
+                    'Target skor: ${match.maxScore}',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                  // Muncul otomatis begitu kedua skor sama-sama
+                  // menyentuh maxScore-1 (hanya kalau deuce aktif).
+                  if (match.isDeuce)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        'DEUCE!',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-            // Dua ScoreArea terpisah, masing-masing punya Listener
-            // sendiri (lihat penjelasan di score_area.dart) -> keduanya
-            // bisa ditekan secara BERSAMAAN oleh 2 pemain berbeda
-            // tanpa saling mengganggu.
             Expanded(
               child: Row(
                 children: [
                   Expanded(
                     child: ScoreArea(
-                      playerLabel: 'Pemain 1',
+                      playerLabel: match.player1Name,
                       score: match.player1Score,
                       color: Colors.blue.shade600,
                       onTap: () => controller.addPoint(1),
@@ -85,7 +93,7 @@ class GameScreen extends StatelessWidget {
                   const VerticalDivider(width: 2, color: Colors.white),
                   Expanded(
                     child: ScoreArea(
-                      playerLabel: 'Pemain 2',
+                      playerLabel: match.player2Name,
                       score: match.player2Score,
                       color: Colors.red.shade600,
                       onTap: () => controller.addPoint(2),

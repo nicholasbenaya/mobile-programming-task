@@ -1,60 +1,75 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../models/match_model.dart';
 
 /// CONTROLLER (MVC)
 ///
-/// `ChangeNotifier` adalah kelas bawaan Flutter yang punya method
-/// `notifyListeners()`. Widget yang "subscribe" ke kelas ini (lewat
-/// package `provider`) akan otomatis rebuild setiap kali method
-/// tersebut dipanggil. Ini menggantikan `setState` manual di dalam
-/// widget, sehingga logic-nya bisa dipisah total dari UI (View
-/// jadi "bodoh", cuma nampilin data dan manggil method).
-///
-/// Semua ATURAN PERMAINAN ada di sini, bukan di widget:
-/// - berapa max score
-/// - apa yang terjadi saat pemain menekan area-nya
-/// - kapan status berubah jadi "finished"
-/// - bagaimana cara reset
+/// Tempat satu-satunya logic "aturan main" hidup: nambah skor,
+/// cek siapa menang (termasuk aturan deuce), reset ronde, dsb.
+/// View (SettingsScreen/GameScreen) tidak pernah mengubah skor
+/// secara langsung -- selalu lewat method di sini, lalu
+/// notifyListeners() memberi tahu View untuk render ulang.
 class GameController extends ChangeNotifier {
-  MatchModel _match = const MatchModel(maxScore: 11);
+  MatchModel match = const MatchModel(maxScore: 11);
 
-  MatchModel get match => _match;
-
-  /// Dipanggil dari halaman Setting sebelum permainan dimulai.
-  void setMaxScoreAndStart(int maxScore) {
-    _match = MatchModel(maxScore: maxScore, status: MatchStatus.playing);
-    notifyListeners();
-  }
-
-  /// Dipanggil setiap kali area pemain 1 atau 2 ditekan.
-  /// `player` bernilai 1 atau 2.
-  void addPoint(int player) {
-    // Guard: kalau match sudah selesai, tap diabaikan supaya skor
-    // tidak terus bertambah setelah ada pemenang.
-    if (_match.status != MatchStatus.playing) return;
-
-    final newP1 = player == 1 ? _match.player1Score + 1 : _match.player1Score;
-    final newP2 = player == 2 ? _match.player2Score + 1 : _match.player2Score;
-
-    final isFinished = newP1 >= _match.maxScore || newP2 >= _match.maxScore;
-
-    _match = _match.copyWith(
-      player1Score: newP1,
-      player2Score: newP2,
-      status: isFinished ? MatchStatus.finished : MatchStatus.playing,
+  void setMaxScoreAndStart(
+    int maxScore, {
+    required String player1Name,
+    required String player2Name,
+    required bool useDeuce,
+  }) {
+    match = MatchModel(
+      player1Name: player1Name,
+      player2Name: player2Name,
+      maxScore: maxScore,
+      useDeuce: useDeuce,
+      status: MatchStatus.playing,
     );
     notifyListeners();
   }
 
-  /// Main ulang dengan max score yang sama, skor kembali 0-0.
-  void rematch() {
-    _match = MatchModel(maxScore: _match.maxScore, status: MatchStatus.playing);
+  void addPoint(int player) {
+    if (match.status != MatchStatus.playing) return;
+
+    final updated = match.copyWith(
+      player1Score:
+          player == 1 ? match.player1Score + 1 : match.player1Score,
+      player2Score:
+          player == 2 ? match.player2Score + 1 : match.player2Score,
+    );
+
+    match = updated.copyWith(status: _checkStatus(updated));
     notifyListeners();
   }
 
-  /// Kembali ke halaman setting untuk ubah max score dari awal.
+  /// Aturan menang:
+  /// - Tanpa deuce: langsung selesai begitu salah satu skor >= maxScore.
+  /// - Dengan deuce: harus skor >= maxScore DAN unggul minimal 2 poin
+  ///   dari lawan (contoh: 12-10 menang, 11-10 belum, lanjut sampai
+  ///   ada yang unggul 2).
+  MatchStatus _checkStatus(MatchModel m) {
+    final higher =
+        m.player1Score > m.player2Score ? m.player1Score : m.player2Score;
+    final diff = (m.player1Score - m.player2Score).abs();
+
+    final isOver =
+        m.useDeuce ? (higher >= m.maxScore && diff >= 2) : higher >= m.maxScore;
+
+    return isOver ? MatchStatus.finished : MatchStatus.playing;
+  }
+
+  /// Main lagi dengan pengaturan (nama, maxScore, deuce) yang sama.
+  void rematch() {
+    match = match.copyWith(
+      player1Score: 0,
+      player2Score: 0,
+      status: MatchStatus.playing,
+    );
+    notifyListeners();
+  }
+
+  /// Balik ke SettingsScreen untuk ubah pengaturan.
   void backToSetup() {
-    _match = MatchModel(maxScore: _match.maxScore, status: MatchStatus.setup);
+    match = match.copyWith(status: MatchStatus.setup);
     notifyListeners();
   }
 }

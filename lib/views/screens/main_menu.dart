@@ -67,27 +67,15 @@ class MainMenuScreen extends StatelessWidget {
                 const SizedBox(height: 36),
                 InkWell(
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                    );
-                  },
-                  child: Image.asset(
-                    'assets/images/OPTIONS.png',
-                    height: 64,
-                  ),
-                ),
-                const SizedBox(height: 36),
-                InkWell(
-                  onTap: () {
                     _showExitConfirmation(context);
                   },
                   child: Image.asset(
-                    'assets/images/EXIT.png',
+                    'assets/images/Exit.png',
                     height: 64,
                     ),
                     ),
                   
-                const SizedBox(height: 222),
+                const SizedBox(height: 107),
               ],
             ),
           ),

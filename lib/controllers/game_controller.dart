@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import '../models/match_model.dart';
+import '../models/match_history_entry.dart';
 
-/// CONTROLLER (MVC)
-///
-/// Tempat satu-satunya logic "aturan main" hidup: nambah skor,
-/// cek siapa menang (termasuk aturan deuce), reset ronde, dsb.
-/// View (SettingsScreen/GameScreen) tidak pernah mengubah skor
-/// secara langsung -- selalu lewat method di sini, lalu
-/// notifyListeners() memberi tahu View untuk render ulang.
 class GameController extends ChangeNotifier {
   MatchModel match = const MatchModel(maxScore: 11);
+
+  // Riwayat pertandingan yang sudah selesai, terbaru di posisi awal.
+  // Simpan sebagai unmodifiable view supaya View tidak bisa
+  // mengubahnya langsung -- harus lewat method Controller.
+  final List<MatchHistoryEntry> _history = [];
+  List<MatchHistoryEntry> get history => List.unmodifiable(_history);
 
   void setMaxScoreAndStart(
     int maxScore, {
@@ -37,15 +37,31 @@ class GameController extends ChangeNotifier {
           player == 2 ? match.player2Score + 1 : match.player2Score,
     );
 
-    match = updated.copyWith(status: _checkStatus(updated));
+    final newStatus = _checkStatus(updated);
+    match = updated.copyWith(status: newStatus);
+
+    if (newStatus == MatchStatus.finished) {
+      _saveToHistory(match);
+    }
+
     notifyListeners();
   }
 
-  /// Aturan menang:
-  /// - Tanpa deuce: langsung selesai begitu salah satu skor >= maxScore.
-  /// - Dengan deuce: harus skor >= maxScore DAN unggul minimal 2 poin
-  ///   dari lawan (contoh: 12-10 menang, 11-10 belum, lanjut sampai
-  ///   ada yang unggul 2).
+  void _saveToHistory(MatchModel m) {
+    _history.insert(
+      0,
+      MatchHistoryEntry(
+        player1Name: m.player1Name,
+        player2Name: m.player2Name,
+        player1Score: m.player1Score,
+        player2Score: m.player2Score,
+        maxScore: m.maxScore,
+        useDeuce: m.useDeuce,
+        playedAt: DateTime.now(),
+      ),
+    );
+  }
+
   MatchStatus _checkStatus(MatchModel m) {
     final higher =
         m.player1Score > m.player2Score ? m.player1Score : m.player2Score;
@@ -57,7 +73,6 @@ class GameController extends ChangeNotifier {
     return isOver ? MatchStatus.finished : MatchStatus.playing;
   }
 
-  /// Main lagi dengan pengaturan (nama, maxScore, deuce) yang sama.
   void rematch() {
     match = match.copyWith(
       player1Score: 0,
@@ -67,9 +82,14 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Balik ke SettingsScreen untuk ubah pengaturan.
   void backToSetup() {
     match = match.copyWith(status: MatchStatus.setup);
+    notifyListeners();
+  }
+
+  /// Opsional: bersihkan semua riwayat (misal tombol "Hapus Riwayat").
+  void clearHistory() {
+    _history.clear();
     notifyListeners();
   }
 }

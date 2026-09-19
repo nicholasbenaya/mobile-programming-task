@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
 import '../../models/hero_model.dart';
 import '../../controllers/pahlawan_controller.dart';
 import '../../utils/app_theme.dart';
@@ -16,7 +17,8 @@ class HeroDetailScreen extends StatefulWidget {
     return PageRouteBuilder(
       transitionDuration: const Duration(milliseconds: 380),
       reverseTransitionDuration: const Duration(milliseconds: 280),
-      pageBuilder: (context, animation, secondaryAnimation) => HeroDetailScreen(hero: hero),
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          HeroDetailScreen(hero: hero),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         final curved = CurvedAnimation(
           parent: animation,
@@ -46,7 +48,8 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
   late final AnimationController _animController;
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
-  int _activeTabIndex = 0; // 0: Linimasa & Data, 1: Kisah Biografi, 2: Jasa & Warisan
+  int _activeTabIndex =
+      0; // 0: Linimasa & Data, 1: Kisah Biografi, 2: Jasa & Warisan
   int _saluteCount = 0;
 
   @override
@@ -60,13 +63,10 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
       parent: _animController,
       curve: Curves.easeOutCubic,
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.08),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(
+          CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
+        );
     _animController.forward();
   }
 
@@ -104,7 +104,11 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       tooltip: 'Kembali',
                       onPressed: () => Navigator.of(context).pop(),
                     ),
@@ -119,7 +123,11 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.photo_library_outlined, color: Colors.white, size: 20),
+                        icon: const Icon(
+                          Icons.photo_library_outlined,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                         tooltip: 'Pratinjau Foto',
                         onPressed: () {
                           showDialog(
@@ -132,7 +140,11 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                   ),
                   const SizedBox(width: 8),
                   Padding(
-                    padding: const EdgeInsets.only(top: 8.0, bottom: 8.0, right: 14.0),
+                    padding: const EdgeInsets.only(
+                      top: 8.0,
+                      bottom: 8.0,
+                      right: 14.0,
+                    ),
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.45),
@@ -141,15 +153,20 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                       child: IconButton(
                         icon: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 300),
-                          transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+                          transitionBuilder: (child, anim) =>
+                              ScaleTransition(scale: anim, child: child),
                           child: Icon(
-                            isFav ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                            isFav
+                                ? Icons.bookmark_rounded
+                                : Icons.bookmark_border_rounded,
                             key: ValueKey<bool>(isFav),
                             color: isFav ? AppTheme.accentGold : Colors.white,
                             size: 20,
                           ),
                         ),
-                        tooltip: isFav ? 'Hapus dari favorit' : 'Simpan ke favorit',
+                        tooltip: isFav
+                            ? 'Hapus dari favorit'
+                            : 'Simpan ke favorit',
                         onPressed: () {
                           controller.toggleFavorite(hero.id);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -161,7 +178,9 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                               ),
                               duration: const Duration(seconds: 2),
                               behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           );
                         },
@@ -215,15 +234,22 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                                 decoration: BoxDecoration(
                                   color: Colors.grey.shade900,
                                   borderRadius: BorderRadius.circular(22),
-                                  border: Border.all(color: AppTheme.accentGold, width: 3.5),
+                                  border: Border.all(
+                                    color: AppTheme.accentGold,
+                                    width: 3.5,
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.5),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.5,
+                                      ),
                                       blurRadius: 22,
                                       offset: const Offset(0, 10),
                                     ),
                                     BoxShadow(
-                                      color: AppTheme.accentGold.withValues(alpha: 0.35),
+                                      color: AppTheme.accentGold.withValues(
+                                        alpha: 0.35,
+                                      ),
                                       blurRadius: 10,
                                       spreadRadius: 1,
                                     ),
@@ -239,10 +265,16 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                                         child: Image.asset(
                                           hero.photoPath,
                                           fit: BoxFit.contain, // Foto UTUH dan tidak ngezoom
-                                          errorBuilder: (context, error, stackTrace) => Container(
-                                            color: Colors.grey.shade800,
-                                            child: const Icon(Icons.person, size: 70, color: Colors.white54),
-                                          ),
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  Container(
+                                                    color: Colors.grey.shade800,
+                                                    child: const Icon(
+                                                      Icons.person,
+                                                      size: 70,
+                                                      color: Colors.white54,
+                                                    ),
+                                                  ),
                                         ),
                                       ),
                                       // Elemen Bar Penutup Bawah (Badge Arsip Resmi)
@@ -251,12 +283,21 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                                         left: 0,
                                         right: 0,
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 4),
-                                          color: Colors.black.withValues(alpha: 0.8),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 4,
+                                          ),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.8,
+                                          ),
                                           child: const Row(
-                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
                                             children: [
-                                              Icon(Icons.verified_rounded, color: AppTheme.accentGold, size: 11),
+                                              Icon(
+                                                Icons.verified_rounded,
+                                                color: AppTheme.accentGold,
+                                                size: 11,
+                                              ),
                                               SizedBox(width: 4),
                                               Text(
                                                 'POTRET RESMI',
@@ -279,14 +320,21 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
 
                               // Badge Era Perjuangan
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppTheme.primaryRed,
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.3),
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.2),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.2,
+                                      ),
                                       blurRadius: 6,
                                       offset: const Offset(0, 2),
                                     ),
@@ -306,7 +354,9 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
 
                               // Nama Pahlawan
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                ),
                                 child: Text(
                                   hero.name,
                                   textAlign: TextAlign.center,
@@ -316,7 +366,11 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: -0.5,
                                     shadows: [
-                                      Shadow(color: Colors.black, blurRadius: 8, offset: Offset(0, 2)),
+                                      Shadow(
+                                        color: Colors.black,
+                                        blurRadius: 8,
+                                        offset: Offset(0, 2),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -350,7 +404,9 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                   child: Container(
                     decoration: const BoxDecoration(
                       color: AppTheme.backgroundLight,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(28),
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black12,
@@ -367,15 +423,20 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 1. Dynamic Floating Metric Capsules (Quick Stats)
+                            // 1. Inspiring Golden Quote Card (Always present for inspiration)
+                            const SizedBox(height: 8),
+                            _buildGoldenQuoteCard(context, hero),
+                            const SizedBox(height: 18),
+
+                            // 2. Dynamic Floating Metric Capsules (Quick Stats)
                             _buildQuickMetricsCapsules(hero),
                             const SizedBox(height: 20),
 
-                            // 2. Interactive Dynamic Tab Selector
+                            // 3. Interactive Dynamic Tab Selector
                             _buildDynamicTabSelector(),
                             const SizedBox(height: 18),
 
-                            // 3. Tab Content View (Smoothly Animated)
+                            // 4. Tab Content View (Smoothly Animated)
                             AnimatedSwitcher(
                               duration: const Duration(milliseconds: 320),
                               switchInCurve: Curves.easeOutCubic,
@@ -395,10 +456,6 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                               child: _buildActiveTabContent(hero),
                             ),
                             const SizedBox(height: 20),
-
-                            // 4. Inspiring Golden Quote Card (Always present for inspiration)
-                            _buildGoldenQuoteCard(context, hero),
-                            const SizedBox(height: 18),
 
                             // 5. SK Penetapan & Persemayaman Card
                             _buildDecreeAndRestingPlaceCard(hero),
@@ -426,40 +483,56 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
 
   /// Kapsul Metrik Dinamis (Quick Data Badges)
   Widget _buildQuickMetricsCapsules(HeroModel hero) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          _buildPillBadge(
-            icon: Icons.access_time_filled_rounded,
-            label: 'Masa Hidup',
-            value: hero.lifeTimeYears,
-            color: AppTheme.primaryRed,
-          ),
-          const SizedBox(width: 10),
-          _buildPillBadge(
-            icon: Icons.hourglass_bottom_rounded,
-            label: 'Usia Wafat',
-            value: '${hero.ageAtDeath} Tahun',
-            color: AppTheme.warmAmber,
-          ),
-          const SizedBox(width: 10),
-          _buildPillBadge(
-            icon: Icons.explore_rounded,
-            label: 'Wilayah',
-            value: hero.regionGroup,
-            color: Colors.teal.shade700,
-          ),
-          const SizedBox(width: 10),
-          _buildPillBadge(
-            icon: Icons.pin_drop_rounded,
-            label: 'Asal',
-            value: hero.originCity,
-            color: Colors.blue.shade700,
-          ),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columnCount = constraints.maxWidth >= 700 ? 4 : 2;
+        final itemWidth =
+            (constraints.maxWidth - (columnCount - 1) * 10) / columnCount;
+
+        return Wrap(
+          alignment: WrapAlignment.spaceEvenly,
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            SizedBox(
+              width: itemWidth,
+              child: _buildPillBadge(
+                icon: Icons.access_time_filled_rounded,
+                label: 'Masa Hidup',
+                value: hero.lifeTimeYears,
+                color: AppTheme.primaryRed,
+              ),
+            ),
+            SizedBox(
+              width: itemWidth,
+              child: _buildPillBadge(
+                icon: Icons.hourglass_bottom_rounded,
+                label: 'Usia Wafat',
+                value: '${hero.ageAtDeath} Tahun',
+                color: AppTheme.warmAmber,
+              ),
+            ),
+            SizedBox(
+              width: itemWidth,
+              child: _buildPillBadge(
+                icon: Icons.explore_rounded,
+                label: 'Wilayah',
+                value: hero.regionGroup,
+                color: Colors.teal.shade700,
+              ),
+            ),
+            SizedBox(
+              width: itemWidth,
+              child: _buildPillBadge(
+                icon: Icons.pin_drop_rounded,
+                label: 'Asal',
+                value: hero.originCity,
+                color: Colors.blue.shade700,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -470,7 +543,8 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -570,7 +644,9 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                     Icon(
                       tab['icon'] as IconData,
                       size: 16,
-                      color: isSelected ? AppTheme.primaryRed : AppTheme.textMuted,
+                      color: isSelected
+                          ? AppTheme.primaryRed
+                          : AppTheme.textMuted,
                     ),
                     const SizedBox(width: 6),
                     Flexible(
@@ -580,8 +656,12 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                          color: isSelected ? AppTheme.primaryRed : AppTheme.textMuted,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                          color: isSelected
+                              ? AppTheme.primaryRed
+                              : AppTheme.textMuted,
                         ),
                       ),
                     ),
@@ -644,7 +724,11 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                   color: AppTheme.primaryRed.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.history_edu_rounded, color: AppTheme.primaryRed, size: 22),
+                child: const Icon(
+                  Icons.history_edu_rounded,
+                  color: AppTheme.primaryRed,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Column(
@@ -824,7 +908,11 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                     color: AppTheme.warmAmber.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.bolt_rounded, color: AppTheme.warmAmber, size: 20),
+                  child: const Icon(
+                    Icons.bolt_rounded,
+                    color: AppTheme.warmAmber,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -907,7 +995,11 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                   color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.stars_rounded, color: Colors.blue.shade800, size: 22),
+                child: Icon(
+                  Icons.stars_rounded,
+                  color: Colors.blue.shade800,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Column(
@@ -988,10 +1080,7 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFFBA1A1A),
-            Color(0xFF7F000A),
-          ],
+          colors: [Color(0xFFBA1A1A), Color(0xFF7F000A)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1010,23 +1099,39 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.format_quote_rounded, color: AppTheme.accentGold, size: 38),
+              const Icon(
+                Icons.format_quote_rounded,
+                color: AppTheme.accentGold,
+                size: 38,
+              ),
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 18),
+                  icon: const Icon(
+                    Icons.copy_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                   tooltip: 'Salin Kutipan Inspiratif',
                   onPressed: () {
-                    Clipboard.setData(ClipboardData(text: '"${hero.famousQuote}" — ${hero.name}'));
+                    Clipboard.setData(
+                      ClipboardData(
+                        text: '"${hero.famousQuote}" — ${hero.name}',
+                      ),
+                    );
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: const Text('✨ Kutipan berhasil disalin ke clipboard!'),
+                        content: const Text(
+                          '✨ Kutipan berhasil disalin ke clipboard!',
+                        ),
                         duration: const Duration(seconds: 2),
                         behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     );
                   },
@@ -1089,11 +1194,20 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('• ', style: TextStyle(color: AppTheme.primaryRed, fontWeight: FontWeight.bold)),
+              const Text(
+                '• ',
+                style: TextStyle(
+                  color: AppTheme.primaryRed,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               Expanded(
                 child: Text(
                   'Dasar Penetapan Gelar: ${hero.decreeNumber}',
-                  style: const TextStyle(fontSize: 12.5, color: AppTheme.textDark),
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppTheme.textDark,
+                  ),
                 ),
               ),
             ],
@@ -1102,11 +1216,20 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('• ', style: TextStyle(color: AppTheme.primaryRed, fontWeight: FontWeight.bold)),
+              const Text(
+                '• ',
+                style: TextStyle(
+                  color: AppTheme.primaryRed,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               Expanded(
                 child: Text(
                   'Lokasi Persemayaman: ${hero.burialPlace}',
-                  style: const TextStyle(fontSize: 12.5, color: AppTheme.textDark),
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppTheme.textDark,
+                  ),
                 ),
               ),
             ],
@@ -1151,22 +1274,31 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                 });
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('🫡 Anda memberikan hormat kepada ${hero.name}! ($_saluteCount kali)'),
+                    content: Text(
+                      '🫡 Anda memberikan hormat kepada ${hero.name}! ($_saluteCount kali)',
+                    ),
                     duration: const Duration(seconds: 1),
                     behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 );
               },
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Text('🫡', style: TextStyle(fontSize: 16)),
                     const SizedBox(width: 6),
                     Text(
-                      _saluteCount == 0 ? 'Beri Hormat' : '$_saluteCount Hormat',
+                      _saluteCount == 0
+                          ? 'Beri Hormat'
+                          : '$_saluteCount Hormat',
                       style: const TextStyle(
                         color: AppTheme.warmAmber,
                         fontWeight: FontWeight.bold,
@@ -1187,19 +1319,28 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                 backgroundColor: AppTheme.primaryRed,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 elevation: 0,
               ),
               onPressed: () {
-                Clipboard.setData(ClipboardData(
-                  text: '${hero.name} (${hero.knownAs})\nAsal: ${hero.fullOrigin}\nMasa Hidup: ${hero.lifeTimeYears}\n\n"${hero.famousQuote}"',
-                ));
+                Clipboard.setData(
+                  ClipboardData(
+                    text:
+                        '${hero.name} (${hero.knownAs})\nAsal: ${hero.fullOrigin}\nMasa Hidup: ${hero.lifeTimeYears}\n\n"${hero.famousQuote}"',
+                  ),
+                );
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: const Text('📋 Ringkasan pahlawan berhasil disalin! Siap dibagikan.'),
+                    content: const Text(
+                      '📋 Ringkasan pahlawan berhasil disalin! Siap dibagikan.',
+                    ),
                     duration: const Duration(seconds: 2),
                     behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 );
               },

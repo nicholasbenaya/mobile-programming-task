@@ -103,7 +103,7 @@ Pahlawan Nasional/
 
 1. Buka terminal dan masuk ke direktori proyek:
    ```bash
-   cd "C:\Users\Fito   Dwi Ardiansah\Downloads\Pahlawan Nasional"
+   cd Tugas-2
    ```
 
 2. Ambil dependensi paket:

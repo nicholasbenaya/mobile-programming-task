@@ -615,59 +615,15 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
           final isSelected = _activeTabIndex == index;
           final tab = tabs[index];
           return Expanded(
-            child: GestureDetector(
+            child: _HoverableDetailTab(
+              icon: tab['icon'] as IconData,
+              title: tab['title'] as String,
+              isSelected: isSelected,
               onTap: () {
                 setState(() {
                   _activeTabIndex = index;
                 });
               },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      tab['icon'] as IconData,
-                      size: 16,
-                      color: isSelected
-                          ? AppTheme.primaryRed
-                          : AppTheme.textMuted,
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        tab['title'] as String,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.w500,
-                          color: isSelected
-                              ? AppTheme.primaryRed
-                              : AppTheme.textMuted,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           );
         }),
@@ -1352,6 +1308,94 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HoverableDetailTab extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _HoverableDetailTab({
+    required this.icon,
+    required this.title,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  State<_HoverableDetailTab> createState() => _HoverableDetailTabState();
+}
+
+class _HoverableDetailTabState extends State<_HoverableDetailTab> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isHighlighted = widget.isSelected || _isHovered;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: widget.isSelected
+                ? Colors.white
+                : _isHovered
+                ? Colors.white.withValues(alpha: 0.72)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: isHighlighted
+                ? [
+                    BoxShadow(
+                      color: widget.isSelected
+                          ? Colors.black.withValues(alpha: 0.08)
+                          : AppTheme.primaryRed.withValues(alpha: 0.16),
+                      blurRadius: widget.isSelected ? 8 : 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                widget.icon,
+                size: 16,
+                color: widget.isSelected || _isHovered
+                    ? AppTheme.primaryRed
+                    : AppTheme.textMuted,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: widget.isSelected || _isHovered
+                        ? FontWeight.bold
+                        : FontWeight.w500,
+                    color: widget.isSelected || _isHovered
+                        ? AppTheme.primaryRed
+                        : AppTheme.textMuted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

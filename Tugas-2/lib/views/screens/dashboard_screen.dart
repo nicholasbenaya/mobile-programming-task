@@ -42,10 +42,6 @@ class DashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Hero Banner Jasmerah
-              _buildBannerCard(context),
-              const SizedBox(height: 20),
-
               // Statistics Metrics
               const Text(
                 'Ringkasan Data & Sejarah',
@@ -59,12 +55,11 @@ class DashboardScreen extends StatelessWidget {
               _buildStatsGrid(context, controller),
               const SizedBox(height: 22),
 
-              // Pahlawan Sorotan Hari Ini (Featured Hero Card)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Pahlawan Sorotan Hari Ini',
+                    'Pahlawan Hari Ini',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -106,80 +101,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBannerCard(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppTheme.primaryRed, Color(0xFF7F000A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primaryRed.withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.shield_outlined, color: Colors.white, size: 14),
-                    SizedBox(width: 4),
-                    Text(
-                      'Jasmerah',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              const Icon(Icons.star_rounded, color: AppTheme.accentGold, size: 22),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Jangan Sekali-kali Melupakan Sejarah',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-              height: 1.25,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Kenali 15 pahlawan nasional dari berbagai penjuru Nusantara, rekam jejak perjuangan, masa hidup, dan keteladanannya bagi bangsa Indonesia.',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 12.5,
-              height: 1.45,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
+ 
   Widget _buildStatsGrid(BuildContext context, PahlawanController controller) {
     return LayoutBuilder(
       builder: (context, constraints) {

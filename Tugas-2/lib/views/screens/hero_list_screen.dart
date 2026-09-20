@@ -4,9 +4,17 @@ import '../../controllers/pahlawan_controller.dart';
 import '../../utils/app_theme.dart';
 import '../widgets/hero_card.dart';
 import '../widgets/search_filter_bar.dart';
+import 'hero_list_screen_other.dart';
 
-class HeroListScreen extends StatelessWidget {
+class HeroListScreen extends StatefulWidget {
   const HeroListScreen({super.key});
+
+  @override
+  State<HeroListScreen> createState() => _HeroListScreenState();
+}
+
+class _HeroListScreenState extends State<HeroListScreen> {
+  bool _isCatalogView = false;
 
   @override
   Widget build(BuildContext context) {
@@ -22,10 +30,12 @@ class HeroListScreen extends StatelessWidget {
               controller.selectedEra != 'Semua')
             TextButton.icon(
               onPressed: () => controller.resetFilters(),
-              icon: const Icon(Icons.refresh_rounded, size: 16, color: AppTheme.primaryRed),
+              icon: const Icon(Icons.refresh_rounded,
+                  size: 16, color: AppTheme.primaryRed),
               label: const Text(
                 'Reset',
-                style: TextStyle(color: AppTheme.primaryRed, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    color: AppTheme.primaryRed, fontWeight: FontWeight.bold),
               ),
             ),
         ],
@@ -35,34 +45,53 @@ class HeroListScreen extends StatelessWidget {
           // Search & Filter Bar
           const SearchFilterBar(),
 
-          // Info Jumlah Hasil
+          // Info Jumlah Hasil + Switch Katalog
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+            padding: const EdgeInsets.fromLTRB(20, 6, 12, 6),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Menampilkan ${heroes.length} dari ${controller.allHeroes.length} Pahlawan',
-                  style: const TextStyle(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Menampilkan ${heroes.length} dari ${controller.allHeroes.length} Pahlawan',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                      if (controller.selectedRegion != 'Semua')
+                        Text(
+                          'Wilayah: ${controller.selectedRegion}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryRed,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const Text(
+                  'Katalog',
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textMuted,
                   ),
                 ),
-                if (controller.selectedRegion != 'Semua')
-                  Text(
-                    'Wilayah: ${controller.selectedRegion}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryRed,
-                    ),
-                  ),
+                Switch(
+                  value: _isCatalogView,
+                  activeColor: AppTheme.primaryRed,
+                  onChanged: (value) => setState(() => _isCatalogView = value),
+                ),
               ],
             ),
           ),
 
-          // List Data Pahlawan (Mekanisme 3b & 3c)
+          // Konten: List (default) atau Katalog
           Expanded(
             child: heroes.isEmpty
                 ? Center(
@@ -71,17 +100,20 @@ class HeroListScreen extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.search_off_rounded, size: 64, color: Colors.grey.shade400),
+                          Icon(Icons.search_off_rounded,
+                              size: 64, color: Colors.grey.shade400),
                           const SizedBox(height: 16),
                           const Text(
                             'Pahlawan Tidak Ditemukan',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 6),
                           const Text(
                             'Coba ubah kata kunci pencarian atau reset filter wilayah Anda.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                            style: TextStyle(
+                                color: AppTheme.textMuted, fontSize: 13),
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton(
@@ -96,13 +128,21 @@ class HeroListScreen extends StatelessWidget {
                       ),
                     ),
                   )
-                : ListView.builder(
-                    padding: const EdgeInsets.only(top: 4, bottom: 24),
-                    itemCount: heroes.length,
-                    itemBuilder: (context, index) {
-                      final hero = heroes[index];
-                      return HeroCard(hero: hero);
-                    },
+                : AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: _isCatalogView
+                        ? HeroListScreenOther(
+                            key: const ValueKey('catalog'),
+                            heroes: heroes,
+                          )
+                        : ListView.builder(
+                            key: const ValueKey('list'),
+                            padding: const EdgeInsets.only(top: 4, bottom: 24),
+                            itemCount: heroes.length,
+                            itemBuilder: (context, index) {
+                              return HeroCard(hero: heroes[index]);
+                            },
+                          ),
                   ),
           ),
         ],

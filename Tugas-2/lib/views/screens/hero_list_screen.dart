@@ -75,7 +75,7 @@ class _HeroListScreenState extends State<HeroListScreen> {
                   ),
                 ),
                 const Text(
-                  'Katalog',
+                  'View Katalog',
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,

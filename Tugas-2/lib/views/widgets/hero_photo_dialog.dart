@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../models/hero_model.dart';
 import '../../utils/app_theme.dart';
 import '../screens/hero_detail_screen.dart';
@@ -38,7 +39,9 @@ class HeroPhotoDialog extends StatelessWidget {
                 Container(
                   height: 290,
                   decoration: const BoxDecoration(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -76,10 +79,15 @@ class HeroPhotoDialog extends StatelessWidget {
                         Image.asset(
                           hero.photoPath,
                           fit: BoxFit.contain, // Foto 100% utuh tanpa zoom
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: Colors.grey.shade800,
-                            child: const Icon(Icons.person, size: 70, color: Colors.white54),
-                          ),
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                color: Colors.grey.shade800,
+                                child: const Icon(
+                                  Icons.person,
+                                  size: 70,
+                                  color: Colors.white54,
+                                ),
+                              ),
                         ),
                         // Label Box Penutup Bawah
                         Positioned(
@@ -110,14 +118,8 @@ class HeroPhotoDialog extends StatelessWidget {
                 Positioned(
                   top: 12,
                   right: 12,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.black45,
-                    radius: 17,
-                    child: IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                      padding: EdgeInsets.zero,
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
+                  child: _HoverableCloseButton(
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
                 ),
               ],
@@ -157,7 +159,10 @@ class HeroPhotoDialog extends StatelessWidget {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.warmAmber.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(10),
@@ -176,12 +181,20 @@ class HeroPhotoDialog extends StatelessWidget {
                   const Divider(height: 20),
                   Row(
                     children: [
-                      const Icon(Icons.place_rounded, size: 15, color: AppTheme.primaryRed),
+                      const Icon(
+                        Icons.place_rounded,
+                        size: 15,
+                        color: AppTheme.primaryRed,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           hero.fullOrigin,
-                          style: const TextStyle(fontSize: 12.5, color: AppTheme.textDark, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: AppTheme.textDark,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
@@ -189,11 +202,19 @@ class HeroPhotoDialog extends StatelessWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(Icons.history_rounded, size: 15, color: AppTheme.textMuted),
+                      const Icon(
+                        Icons.history_rounded,
+                        size: 15,
+                        color: AppTheme.textMuted,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Masa Hidup: ${hero.lifeTimeYears} (${hero.ageAtDeath} tahun)',
-                        style: const TextStyle(fontSize: 12.5, color: AppTheme.textDark, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: AppTheme.textDark,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -211,33 +232,117 @@ class HeroPhotoDialog extends StatelessWidget {
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryRed,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 0,
-                      ),
+                    child: _HoverableDetailButton(
                       onPressed: () {
                         Navigator.of(context).pop();
-                        Navigator.of(context).push(
-                          HeroDetailScreen.route(hero),
-                        );
+                        Navigator.of(context)
+                            .push(HeroDetailScreen.route(hero));
                       },
-                      icon: const Icon(Icons.menu_book_rounded, size: 17),
-                      label: const Text(
-                        'Buka Halaman Detail Pahlawan',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
                     ),
                   ),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HoverableCloseButton extends StatefulWidget {
+  final VoidCallback onPressed;
+
+  const _HoverableCloseButton({required this.onPressed});
+
+  @override
+  State<_HoverableCloseButton> createState() => _HoverableCloseButtonState();
+}
+
+class _HoverableCloseButtonState extends State<_HoverableCloseButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        decoration: BoxDecoration(
+          color: _isHovered ? Colors.black87 : Colors.black45,
+          shape: BoxShape.circle,
+          boxShadow: _isHovered
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: IconButton(
+          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+          padding: EdgeInsets.zero,
+          onPressed: widget.onPressed,
+        ),
+      ),
+    );
+  }
+}
+
+class _HoverableDetailButton extends StatefulWidget {
+  final VoidCallback onPressed;
+
+  const _HoverableDetailButton({required this.onPressed});
+
+  @override
+  State<_HoverableDetailButton> createState() => _HoverableDetailButtonState();
+}
+
+class _HoverableDetailButtonState extends State<_HoverableDetailButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: _isHovered
+              ? [
+                  BoxShadow(
+                    color: AppTheme.primaryRed.withValues(alpha: 0.35),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
+              : null,
+        ),
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _isHovered
+                ? AppTheme.primaryRed.withValues(alpha: 0.9)
+                : AppTheme.primaryRed,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            elevation: _isHovered ? 3 : 0,
+          ),
+          onPressed: widget.onPressed,
+          icon: const Icon(Icons.menu_book_rounded, size: 17),
+          label: const Text(
+            'Buka Halaman Detail Pahlawan',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
         ),
       ),
     );

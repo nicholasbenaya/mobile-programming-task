@@ -41,6 +41,89 @@ cd mobile-programming-task
 
 Setiap tugas memiliki folder sendiri. Jalankan perintah Flutter dari folder tugas yang ingin digunakan.
 
+## How to Contribute
+
+### 1. Siapkan Repository
+
+Pastikan branch lokal sudah menggunakan versi terbaru dari `main`:
+
+```bash
+git switch main
+git pull origin main
+```
+
+### 2. Buat Branch Fitur
+
+Buat branch baru untuk setiap perubahan. Gunakan nama yang singkat dan deskriptif:
+
+```bash
+git switch -c feature/nama-fitur
+```
+
+Contoh prefix branch:
+
+- `feature/` untuk fitur baru
+- `fix/` untuk perbaikan bug
+- `docs/` untuk dokumentasi
+- `polishing/` untuk penyempurnaan tampilan atau interaksi
+
+Jangan mengerjakan perubahan langsung di branch `main`.
+
+### 3. Kerjakan Perubahan
+
+- Ikuti struktur folder dan pola kode dari tugas yang sedang dikerjakan.
+- Jalankan perintah dari folder tugas terkait, misalnya `Tugas-2`.
+- Jangan menyertakan file hasil build, konfigurasi lokal, atau perubahan yang tidak berkaitan.
+- Gunakan pesan commit yang singkat dan menjelaskan perubahan.
+
+Contoh:
+
+```bash
+cd Tugas-2
+flutter pub get
+flutter analyze
+flutter test
+```
+
+### 4. Commit dan Push
+
+Kembali ke root repository jika diperlukan, lalu commit perubahan pada branch fitur:
+
+```bash
+git add path/ke/file
+git commit -m "Add descriptive change"
+git push -u origin feature/nama-fitur
+```
+
+### 5. Buat Pull Request
+
+Buat Pull Request dari branch fitur ke `main` dengan informasi berikut:
+
+- Ringkasan perubahan.
+- Alasan perubahan diperlukan.
+- Cara menguji perubahan.
+- Screenshot atau video jika perubahan memengaruhi tampilan.
+- Catatan tentang hal yang belum selesai atau perlu diperhatikan.
+
+Sebelum meminta review, pastikan branch sudah diperbarui dari `main` dan semua pemeriksaan yang relevan berhasil:
+
+```bash
+git switch feature/nama-fitur
+git fetch origin
+git merge origin/main
+flutter analyze
+flutter test
+```
+
+Setelah Pull Request selesai di-merge, hapus branch fitur lokal dan remote jika sudah tidak diperlukan:
+
+```bash
+git switch main
+git pull origin main
+git branch -d feature/nama-fitur
+git push origin --delete feature/nama-fitur
+```
+
 ## Menjalankan Tugas 1
 
 Tugas 1 adalah aplikasi skor pertandingan 2 pemain.

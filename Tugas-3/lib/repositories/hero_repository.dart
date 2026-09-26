@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/hero_model.dart';
@@ -8,12 +11,35 @@ import '../services/supabase_service.dart';
 ///   client.from('heroes').select()
 /// sama dengan request GET ke URL REST project Supabase.
 class HeroRepository {
+  static const usesExternalApi = true;
   SupabaseClient get _client => SupabaseService.client;
 
   static const _heroSelect = '*, hero_contributions(contribution, sort_order)';
+  static const _externalHeroesUrl =
+      'https://indonesia-public-static-api.vercel.app/api/heroes';
 
   /// GET semua pahlawan beserta kontribusinya (join tabel sekaligus).
   Future<List<HeroModel>> getAllHeroes() async {
+    final response = await http.get(Uri.parse(_externalHeroesUrl));
+    if (response.statusCode != 200) {
+      throw StateError(
+        'API pahlawan mengembalikan HTTP ${response.statusCode}.',
+      );
+    }
+    final payload = jsonDecode(response.body);
+    if (payload is! List) {
+      throw const FormatException('Format response API pahlawan tidak valid.');
+    }
+    return payload
+        .whereType<Map<String, dynamic>>()
+        .toList()
+        .asMap()
+        .entries
+        .map((entry) => HeroModel.fromExternalApi(entry.value, entry.key))
+        .toList();
+  }
+
+  Future<List<HeroModel>> getAllHeroesFromSupabase() async {
     final List<Map<String, dynamic>> rows = await _client
         .from('heroes')
         .select(_heroSelect)

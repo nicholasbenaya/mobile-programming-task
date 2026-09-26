@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/pahlawan_controller.dart';
+import '../../repositories/hero_repository.dart';
 import '../../utils/app_theme.dart';
 import '../widgets/hero_card.dart';
 import '../widgets/search_filter_bar.dart';
@@ -27,13 +28,14 @@ class _HeroListScreenState extends State<HeroListScreen> {
       appBar: AppBar(
         title: const Text('Daftar Pahlawan Nasional'),
         actions: [
-          IconButton(
-            tooltip: 'Kelola data pahlawan',
-            icon: const Icon(Icons.admin_panel_settings_outlined),
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const HeroAdminScreen())),
-          ),
+          if (!HeroRepository.usesExternalApi)
+            IconButton(
+              tooltip: 'Kelola data pahlawan',
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const HeroAdminScreen()),
+              ),
+            ),
           if (controller.searchQuery.isNotEmpty ||
               controller.selectedRegion != 'Semua' ||
               controller.selectedEra != 'Semua')

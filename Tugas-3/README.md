@@ -191,3 +191,17 @@ flutter test
 ```
 
 Jika aplikasi menampilkan error pemuatan data, periksa URL/key, pastikan kedua file SQL sudah dijalankan, dan pastikan **Anonymous Sign-Ins** aktif. Jika tabel kosong, jalankan ulang `supabase/02_seed_data.sql` setelah memastikan schema sudah tersedia.
+
+## Branch API Eksternal
+
+Branch `feature/hero-external-api` menggunakan endpoint publik:
+
+```text
+https://indonesia-public-static-api.vercel.app/api/heroes
+```
+
+Endpoint tersebut menyediakan nama, tahun lahir/wafat, deskripsi, dan tahun penetapan. Karena tidak menyediakan seluruh field aplikasi seperti foto, lokasi makam, quote, dan kontribusi, field tersebut ditampilkan sebagai `Tidak tersedia dari API` atau fallback yang jelas. Branch ini bersifat read-only terhadap sumber eksternal; UI CRUD disembunyikan agar tidak mencoba mengubah data milik API.
+
+Gunakan branch `feature/hero-crud` untuk mengelola data pahlawan melalui Supabase dengan operasi tambah, edit, dan hapus.
+
+Sumber Gist `hero.json` dapat digunakan sebagai dataset alternatif/import karena memiliki field lebih lengkap, tetapi formatnya merupakan JSON statis dan beberapa nilainya perlu dibersihkan sebelum dimasukkan ke database. Sumber data tersebut tidak dipakai otomatis oleh aplikasi.

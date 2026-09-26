@@ -17,6 +17,18 @@ Script aman dijalankan ulang untuk tabel `heroes` dan kontribusi karena mengguna
 ```powershell
 flutter run -d chrome
 ```
+
+Untuk memakai data inti lengkap beserta gambar lokal dan kutipan manual, jalankan file SQL dengan urutan berikut di Supabase SQL Editor:
+
+```text
+01_schema.sql
+02_seed_data.sql
+03_manual_quotes.sql
+```
+
+`02_seed_data.sql` menambahkan 15 pahlawan inti dengan `photo_path` lokal seperti `assets/images/soekarno.jpg`. Dataset Gist memiliki lebih banyak pahlawan dan URL gambar eksternal, tetapi tidak menyediakan kutipan khusus untuk setiap tokoh. `03_manual_quotes.sql` melengkapi kutipan 15 pahlawan inti tanpa mengarang kutipan untuk tokoh yang sumbernya tidak menyediakan kutipan.
+
+Jika gambar URL tetap tidak terlihat, buka DevTools browser dan periksa Network. Pastikan aplikasi sedang memakai branch import dataset dan nilai `photo_path` pada row Supabase diawali `https://`. URL `image.ibb.co` dari dataset mendukung CORS; gambar yang sudah tidak tersedia akan tetap menampilkan placeholder.
 # Aplikasi Informasi Pahlawan Nasional Indonesia
 
 Aplikasi edukasi sejarah berbasis **Flutter** untuk mengenal dan mempelajari kisah keteladanan **Pahlawan Nasional Indonesia**. Dilengkapi dengan interface modern bernuansa kebangsaan.

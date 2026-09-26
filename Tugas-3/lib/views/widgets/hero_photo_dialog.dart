@@ -263,21 +263,10 @@ class _HoverableCloseButton extends StatefulWidget {
 class _HoverableCloseButtonState extends State<_HoverableCloseButton> {
   bool _isHovered = false;
 
-  void _setHovered(bool value) {
-    if (!mounted || _isHovered == value) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _isHovered != value) {
-        setState(() => _isHovered = value);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => _setHovered(true),
-      onExit: (_) => _setHovered(false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         decoration: BoxDecoration(
@@ -315,21 +304,10 @@ class _HoverableDetailButton extends StatefulWidget {
 class _HoverableDetailButtonState extends State<_HoverableDetailButton> {
   bool _isHovered = false;
 
-  void _setHovered(bool value) {
-    if (!mounted || _isHovered == value) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _isHovered != value) {
-        setState(() => _isHovered = value);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => _setHovered(true),
-      onExit: (_) => _setHovered(false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         decoration: BoxDecoration(

@@ -1334,23 +1334,12 @@ class _HoverableDetailTab extends StatefulWidget {
 class _HoverableDetailTabState extends State<_HoverableDetailTab> {
   bool _isHovered = false;
 
-  void _setHovered(bool value) {
-    if (!mounted || _isHovered == value) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _isHovered != value) {
-        setState(() => _isHovered = value);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final isHighlighted = widget.isSelected || _isHovered;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => _setHovered(true),
-      onExit: (_) => _setHovered(false),
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(

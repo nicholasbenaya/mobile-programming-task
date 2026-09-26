@@ -251,96 +251,51 @@ class HeroPhotoDialog extends StatelessWidget {
   }
 }
 
-class _HoverableCloseButton extends StatefulWidget {
+class _HoverableCloseButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   const _HoverableCloseButton({required this.onPressed});
 
   @override
-  State<_HoverableCloseButton> createState() => _HoverableCloseButtonState();
-}
-
-class _HoverableCloseButtonState extends State<_HoverableCloseButton> {
-  bool _isHovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        decoration: BoxDecoration(
-          color: _isHovered ? Colors.black87 : Colors.black45,
-          shape: BoxShape.circle,
-          boxShadow: _isHovered
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-          padding: EdgeInsets.zero,
-          onPressed: widget.onPressed,
-        ),
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.black45,
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        tooltip: 'Tutup',
+        onPressed: onPressed,
       ),
     );
   }
 }
 
-class _HoverableDetailButton extends StatefulWidget {
+class _HoverableDetailButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   const _HoverableDetailButton({required this.onPressed});
 
   @override
-  State<_HoverableDetailButton> createState() => _HoverableDetailButtonState();
-}
-
-class _HoverableDetailButtonState extends State<_HoverableDetailButton> {
-  bool _isHovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        decoration: BoxDecoration(
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppTheme.primaryRed,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          boxShadow: _isHovered
-              ? [
-                  BoxShadow(
-                    color: AppTheme.primaryRed.withValues(alpha: 0.35),
-                    blurRadius: 12,
-                    offset: const Offset(0, 5),
-                  ),
-                ]
-              : null,
         ),
-        child: ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _isHovered
-                ? AppTheme.primaryRed.withValues(alpha: 0.9)
-                : AppTheme.primaryRed,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            elevation: _isHovered ? 3 : 0,
-          ),
-          onPressed: widget.onPressed,
-          icon: const Icon(Icons.menu_book_rounded, size: 17),
-          label: const Text(
-            'Buka Halaman Detail Pahlawan',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-        ),
+        elevation: 0,
+      ),
+      onPressed: onPressed,
+      icon: const Icon(Icons.menu_book_rounded, size: 17),
+      label: const Text(
+        'Buka Halaman Detail Pahlawan',
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
       ),
     );
   }

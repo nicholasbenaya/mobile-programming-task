@@ -14,6 +14,7 @@ class SearchFilterBar extends StatefulWidget {
 
 class _SearchFilterBarState extends State<SearchFilterBar> {
   late final TextEditingController _textController;
+  PahlawanController? _controller;
 
   @override
   void initState() {
@@ -23,7 +24,33 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final newController = context.read<PahlawanController>();
+    if (_controller != newController) {
+      _controller?.removeListener(_onControllerQueryChanged);
+      _controller = newController;
+      _controller?.addListener(_onControllerQueryChanged);
+      _onControllerQueryChanged();
+    }
+  }
+
+  void _onControllerQueryChanged() {
+    final query = _controller?.searchQuery ?? '';
+    if (_textController.text != query) {
+      _textController.value = TextEditingValue(
+        text: query,
+        selection: TextSelection.collapsed(offset: query.length),
+      );
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    _controller?.removeListener(_onControllerQueryChanged);
     _textController.dispose();
     super.dispose();
   }
@@ -40,7 +67,11 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: TextField(
             controller: _textController,
-            onChanged: (val) => controller.setSearchQuery(val),
+            textInputAction: TextInputAction.search,
+            onChanged: (val) {
+              controller.setSearchQuery(val);
+              setState(() {});
+            },
             decoration: InputDecoration(
               hintText: 'Cari pahlawan, daerah asal, atau peristiwa...',
               hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),

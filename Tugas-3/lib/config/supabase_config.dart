@@ -1,12 +1,12 @@
 class SupabaseConfig {
   static const String url = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://xhxrntuzbhlrbvhjccsn.supabase.co',
+    defaultValue: 'https://fuwlkofuuqpctwturjdr.supabase.co',
   );
 
   static const String publishableKey = String.fromEnvironment(
     'SUPABASE_KEY',
-    defaultValue: 'sb_publishable_HBGWHlVRHOX1DG8XV-MZYw_wWBLfcey',
+    defaultValue: 'sb_publishable_5iBDF4E8leLJiqsBscn5mQ_aXFUxTBw',
   );
 
   static bool get isNotConfigured =>

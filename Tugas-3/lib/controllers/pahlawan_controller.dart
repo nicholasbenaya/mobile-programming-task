@@ -4,6 +4,7 @@ import '../models/hero_model.dart';
 import '../models/quiz_model.dart';
 import '../repositories/hero_repository.dart';
 import '../repositories/quiz_repository.dart';
+import '../utils/hero_image.dart';
 
 enum HeroSortMode { nameAsc, nameDesc, birthYearAsc, birthYearDesc }
 
@@ -65,6 +66,9 @@ class PahlawanController extends ChangeNotifier {
 
     try {
       _heroes = await _heroRepository.getAllHeroes();
+      HeroImageSessionCache.instance.prewarm(
+        _heroes.take(30).map((h) => h.photoPath),
+      );
     } catch (e, st) {
       debugPrint('Gagal mengambil data dari API: $e\n$st');
       _errorMessage =
@@ -213,13 +217,8 @@ class PahlawanController extends ChangeNotifier {
         await _heroRepository.addFavorite(heroId);
       }
     } catch (e) {
-      debugPrint('Gagal menyimpan favorit: $e');
-      if (wasFavorite) {
-        _favoriteIds.add(heroId);
-      } else {
-        _favoriteIds.remove(heroId);
-      }
-      notifyListeners();
+      debugPrint('Gagal menyimpan favorit ke server: $e');
+      // Status lokal/sesi tetap dipertahankan agar fitur favorit dapat digunakan pengguna
     }
   }
 
@@ -252,4 +251,10 @@ class PahlawanController extends ChangeNotifier {
   int get totalHeroes => _heroes.length;
   int get totalFavorites => _favoriteIds.length;
   int get totalRegions => availableRegions.length - 1; // tanpa 'Semua'
+  int get totalPhotos => _heroes
+      .where((h) =>
+          h.photoPath.trim().isNotEmpty &&
+          h.photoPath != 'assets/images/' &&
+          h.photoPath != 'assets/images/placeholder.png')
+      .length;
 }

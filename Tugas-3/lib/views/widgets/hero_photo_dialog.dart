@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/hero_model.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/hero_image.dart';
 import '../screens/hero_detail_screen.dart';
 
 class HeroPhotoDialog extends StatelessWidget {
@@ -76,7 +77,7 @@ class HeroPhotoDialog extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.asset(
+                        heroImage(
                           hero.photoPath,
                           fit: BoxFit.contain, // Foto 100% utuh tanpa zoom
                           errorBuilder: (context, error, stackTrace) =>

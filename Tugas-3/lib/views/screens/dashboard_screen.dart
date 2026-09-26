@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../controllers/pahlawan_controller.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/hero_image.dart';
 import '../widgets/stat_card.dart';
 import 'hero_detail_screen.dart';
 
@@ -25,7 +27,11 @@ class DashboardScreen extends StatelessWidget {
                 color: AppTheme.primaryRed.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.flag_rounded, color: AppTheme.primaryRed, size: 20),
+              child: const Icon(
+                Icons.flag_rounded,
+                color: AppTheme.primaryRed,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 10),
             const Text('Pahlawan Nasional'),
@@ -104,7 +110,6 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
- 
   Widget _buildStatsGrid(BuildContext context, PahlawanController controller) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -170,9 +175,7 @@ class DashboardScreen extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
           onTap: () {
-            Navigator.of(context).push(
-              HeroDetailScreen.route(featured),
-            );
+            Navigator.of(context).push(HeroDetailScreen.route(featured));
           },
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -181,7 +184,7 @@ class DashboardScreen extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: Image.asset(
+                  child: heroImage(
                     featured.photoPath,
                     width: 90,
                     height: 110,
@@ -200,7 +203,10 @@ class DashboardScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.primaryRed.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
@@ -245,11 +251,18 @@ class DashboardScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          const Icon(Icons.history_rounded, size: 14, color: AppTheme.textMuted),
+                          const Icon(
+                            Icons.history_rounded,
+                            size: 14,
+                            color: AppTheme.textMuted,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             featured.lifeTimeYears,
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textMuted,
+                            ),
                           ),
                           const Spacer(),
                           const Text(
@@ -352,10 +365,7 @@ class DashboardScreen extends StatelessWidget {
               Text(
                 subtitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppTheme.textMuted,
-                ),
+                style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
               ),
             ],
           ),

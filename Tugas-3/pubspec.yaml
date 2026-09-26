@@ -31,6 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   provider: ^6.1.2
+  http: ^1.6.0
 
   # ===== Database online + REST API =====
   supabase_flutter: ^2.8.0

@@ -1,3 +1,22 @@
+
+### Import Dataset Gist ke Supabase
+
+Branch `feature/import-hero-dataset` menyediakan script `tool/import_hero_dataset.dart` agar dataset tidak perlu dimasukkan satu per satu. Script mengambil raw JSON Gist, membersihkan field yang tidak konsisten, mengubahnya ke schema tabel `heroes`, lalu mengunggah data secara batch. URL gambar dari field `img` disimpan dan ditampilkan sebagai network image oleh Flutter.
+
+Jalankan setelah `01_schema.sql` sudah diterapkan. Gunakan **service role key hanya di terminal lokal**, bukan di source code atau aplikasi Flutter:
+
+```powershell
+cd Tugas-3
+$env:SUPABASE_URL = "https://YOUR_PROJECT_ID.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY = "YOUR_SERVICE_ROLE_KEY"
+dart run tool/import_hero_dataset.dart
+```
+
+Script aman dijalankan ulang untuk tabel `heroes` dan kontribusi karena menggunakan upsert. Setelah import selesai, jalankan aplikasi dengan publishable key seperti biasa:
+
+```powershell
+flutter run -d chrome
+```
 # Aplikasi Informasi Pahlawan Nasional Indonesia
 
 Aplikasi edukasi sejarah berbasis **Flutter** untuk mengenal dan mempelajari kisah keteladanan **Pahlawan Nasional Indonesia**. Dilengkapi dengan interface modern bernuansa kebangsaan.

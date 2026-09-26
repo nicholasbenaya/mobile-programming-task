@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../models/hero_model.dart';
 import '../../controllers/pahlawan_controller.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/hero_image.dart';
 import '../widgets/hero_photo_dialog.dart';
 
 class HeroDetailScreen extends StatefulWidget {
@@ -262,7 +263,7 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                                     children: [
                                       Hero(
                                         tag: 'hero_photo_${hero.id}',
-                                        child: Image.asset(
+                                        child: heroImage(
                                           hero.photoPath,
                                           fit: BoxFit.contain, // Foto UTUH dan tidak ngezoom
                                           errorBuilder:

@@ -27,6 +27,8 @@ create table if not exists public.hero_contributions (
   contribution text not null,
   sort_order   int  not null default 0
 );
+create unique index if not exists hero_contributions_hero_text_idx
+  on public.hero_contributions (hero_id, contribution);
 
 create table if not exists public.quiz_questions (
   id            text primary key,

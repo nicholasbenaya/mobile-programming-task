@@ -64,17 +64,23 @@ class PahlawanController extends ChangeNotifier {
     if (showLoading) notifyListeners();
 
     try {
-      final results = await Future.wait([
-        _heroRepository.getAllHeroes(),
-        _quizRepository.getAllQuestions(),
-      ]);
-      _heroes = results[0] as List<HeroModel>;
-      _quizQuestions = results[1] as List<QuizQuestion>;
+      _heroes = await _heroRepository.getAllHeroes();
     } catch (e, st) {
       debugPrint('Gagal mengambil data dari API: $e\n$st');
       _errorMessage =
           'Gagal mengambil data dari server.\n'
           'Periksa koneksi internet kamu.\n\n($e)';
+    }
+
+    // Kuis bersifat tambahan. Dashboard dan katalog tetap dapat digunakan
+    // apabila tabel quiz belum di-seed pada project Supabase baru.
+    if (_errorMessage == null) {
+      try {
+        _quizQuestions = await _quizRepository.getAllQuestions();
+      } catch (e, st) {
+        debugPrint('Gagal memuat soal kuis: $e\n$st');
+        _quizQuestions = [];
+      }
     }
 
     // Favorit dimuat terpisah: jika gagal (misal login tamu belum diaktifkan),

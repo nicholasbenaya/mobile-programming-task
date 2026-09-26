@@ -14,8 +14,9 @@ Widget heroImage(
 
   final isNetwork =
       imagePath.startsWith('http://') || imagePath.startsWith('https://');
+  final resolvedPath = isNetwork ? _proxyImageUrl(imagePath) : imagePath;
   return Image(
-    image: isNetwork ? NetworkImage(imagePath) : AssetImage(imagePath),
+    image: isNetwork ? NetworkImage(resolvedPath) : AssetImage(resolvedPath),
     fit: fit,
     width: width,
     height: height,
@@ -40,6 +41,17 @@ Widget heroImage(
         errorBuilder ??
         (_, __, ___) => _imagePlaceholder(width: width, height: height),
   );
+}
+
+String _proxyImageUrl(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null || uri.host.isEmpty) return url;
+
+  // The legacy image host is reachable but can be unreliable in browsers.
+  if (uri.host == 'image.ibb.co' || uri.host == 'i.ibb.co') {
+    return 'https://images.weserv.nl/?url=${Uri.encodeComponent(url)}';
+  }
+  return url;
 }
 
 Widget _imagePlaceholder({double? width, double? height}) {

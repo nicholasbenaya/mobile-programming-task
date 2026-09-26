@@ -175,8 +175,24 @@ String _shorten(String value, {int maxLength = 240}) =>
     : '${value.substring(0, maxLength).trim()}...';
 
 String _extractQuote(String value) {
-  final match = RegExp(r'''["“”']([^"“”']{20,180})["“”']''').firstMatch(value);
-  return match?.group(1) ?? 'Kutipan belum tersedia dalam dataset.';
+  final matches = RegExp(r'''["“”']([^"“”']{20,180})["“”']''')
+      .allMatches(value);
+  for (final match in matches) {
+    final quote = match.group(1)?.trim() ?? '';
+    if (_looksLikeQuote(quote)) return quote;
+  }
+  return 'Kutipan khusus belum tersedia dalam dataset.';
+}
+
+bool _looksLikeQuote(String value) {
+  final normalized = value.toLowerCase();
+  const rejected = {
+    'pahlawan nasional',
+    'pendiri muhammadiyah',
+    'pendiri nu',
+    'de padrische tijger van rokan',
+  };
+  return value.length >= 20 && !rejected.contains(normalized);
 }
 
 extension on String? {

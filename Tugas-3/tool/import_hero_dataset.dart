@@ -82,11 +82,6 @@ Future<void> main() async {
   };
   await _upsert('$supabaseUrl/rest/v1/heroes', rows, headers);
   await _upsert(
-    '$supabaseUrl/rest/v1/hero_contributions',
-    contributions,
-    headers,
-  );
-  await _upsert(
     '$supabaseUrl/rest/v1/hero_contributions?on_conflict=hero_id,contribution',
     contributions,
     headers,

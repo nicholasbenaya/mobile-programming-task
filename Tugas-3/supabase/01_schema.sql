@@ -59,6 +59,12 @@ alter table public.favorites          enable row level security;
 
 create policy "Semua orang boleh membaca heroes"
   on public.heroes for select to anon, authenticated using (true);
+create policy "Pengguna terautentikasi boleh menambah heroes"
+  on public.heroes for insert to authenticated with check (true);
+create policy "Pengguna terautentikasi boleh mengubah heroes"
+  on public.heroes for update to authenticated using (true) with check (true);
+create policy "Pengguna terautentikasi boleh menghapus heroes"
+  on public.heroes for delete to authenticated using (true);
 create policy "Semua orang boleh membaca hero_contributions"
   on public.hero_contributions for select to anon, authenticated using (true);
 create policy "Semua orang boleh membaca quiz_questions"

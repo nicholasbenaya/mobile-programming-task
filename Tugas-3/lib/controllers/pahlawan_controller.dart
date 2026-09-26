@@ -1,15 +1,11 @@
 import 'package:flutter/foundation.dart';
+
 import '../models/hero_model.dart';
 import '../models/quiz_model.dart';
 import '../repositories/hero_repository.dart';
 import '../repositories/quiz_repository.dart';
 
-enum HeroSortMode {
-  nameAsc,
-  nameDesc,
-  birthYearAsc,
-  birthYearDesc,
-}
+enum HeroSortMode { nameAsc, nameDesc, birthYearAsc, birthYearDesc }
 
 class PahlawanController extends ChangeNotifier {
   final HeroRepository _heroRepository;
@@ -22,8 +18,8 @@ class PahlawanController extends ChangeNotifier {
     HeroRepository? heroRepository,
     QuizRepository? quizRepository,
     this.startupError,
-  })  : _heroRepository = heroRepository ?? HeroRepository(),
-        _quizRepository = quizRepository ?? QuizRepository();
+  }) : _heroRepository = heroRepository ?? HeroRepository(),
+       _quizRepository = quizRepository ?? QuizRepository();
 
   // Data sekarang diambil dari API Supabase (bukan lagi dari HeroData.heroes)
   List<HeroModel> _heroes = [];
@@ -76,7 +72,8 @@ class PahlawanController extends ChangeNotifier {
       _quizQuestions = results[1] as List<QuizQuestion>;
     } catch (e, st) {
       debugPrint('Gagal mengambil data dari API: $e\n$st');
-      _errorMessage = 'Gagal mengambil data dari server.\n'
+      _errorMessage =
+          'Gagal mengambil data dari server.\n'
           'Periksa koneksi internet kamu.\n\n($e)';
     }
 
@@ -98,22 +95,22 @@ class PahlawanController extends ChangeNotifier {
   }
 
   List<String> get availableRegions => [
-        'Semua',
-        'Jawa',
-        'Sumatera',
-        'Maluku',
-        'Sulawesi',
-        'Bali & Nusa',
-        'Papua',
-      ];
+    'Semua',
+    'Jawa',
+    'Sumatera',
+    'Maluku',
+    'Sulawesi',
+    'Bali & Nusa',
+    'Papua',
+  ];
 
   List<String> get availableEras => [
-        'Semua',
-        'Kemerdekaan & Diplomasi',
-        'Revolusi Kemerdekaan',
-        'Perlawanan Kerajaan / Daerah',
-        'Pendidikan & Emansipasi',
-      ];
+    'Semua',
+    'Kemerdekaan & Diplomasi',
+    'Revolusi Kemerdekaan',
+    'Perlawanan Kerajaan / Daerah',
+    'Pendidikan & Emansipasi',
+  ];
 
   List<HeroModel> get favoriteHeroes =>
       _heroes.where((h) => _favoriteIds.contains(h.id)).toList();
@@ -122,7 +119,9 @@ class PahlawanController extends ChangeNotifier {
   /// Mengembalikan null jika data dari server masih kosong.
   HeroModel? get featuredHero {
     if (_heroes.isEmpty) return null;
-    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
+    final dayOfYear = DateTime.now()
+        .difference(DateTime(DateTime.now().year, 1, 1))
+        .inDays;
     final index = dayOfYear % _heroes.length;
     return _heroes[index];
   }
@@ -132,7 +131,8 @@ class PahlawanController extends ChangeNotifier {
     return _heroes.where((hero) {
       // Filter teks pencarian
       final query = _searchQuery.trim().toLowerCase();
-      final matchQuery = query.isEmpty ||
+      final matchQuery =
+          query.isEmpty ||
           hero.name.toLowerCase().contains(query) ||
           hero.knownAs.toLowerCase().contains(query) ||
           hero.originCity.toLowerCase().contains(query) ||
@@ -140,25 +140,26 @@ class PahlawanController extends ChangeNotifier {
           hero.shortBio.toLowerCase().contains(query);
 
       // Filter wilayah
-      final matchRegion = _selectedRegion == 'Semua' || hero.regionGroup == _selectedRegion;
+      final matchRegion =
+          _selectedRegion == 'Semua' || hero.regionGroup == _selectedRegion;
 
       // Filter era
-      final matchEra = _selectedEra == 'Semua' || hero.struggleEra == _selectedEra;
+      final matchEra =
+          _selectedEra == 'Semua' || hero.struggleEra == _selectedEra;
 
       return matchQuery && matchRegion && matchEra;
-    }).toList()
-      ..sort((a, b) {
-        switch (_sortMode) {
-          case HeroSortMode.nameAsc:
-            return a.name.compareTo(b.name);
-          case HeroSortMode.nameDesc:
-            return b.name.compareTo(a.name);
-          case HeroSortMode.birthYearAsc:
-            return _extractYear(a.birthDate).compareTo(_extractYear(b.birthDate));
-          case HeroSortMode.birthYearDesc:
-            return _extractYear(b.birthDate).compareTo(_extractYear(a.birthDate));
-        }
-      });
+    }).toList()..sort((a, b) {
+      switch (_sortMode) {
+        case HeroSortMode.nameAsc:
+          return a.name.compareTo(b.name);
+        case HeroSortMode.nameDesc:
+          return b.name.compareTo(a.name);
+        case HeroSortMode.birthYearAsc:
+          return _extractYear(a.birthDate).compareTo(_extractYear(b.birthDate));
+        case HeroSortMode.birthYearDesc:
+          return _extractYear(b.birthDate).compareTo(_extractYear(a.birthDate));
+      }
+    });
   }
 
   int _extractYear(String dateStr) {
@@ -217,6 +218,21 @@ class PahlawanController extends ChangeNotifier {
   }
 
   bool isFavorite(String heroId) => _favoriteIds.contains(heroId);
+
+  Future<void> createHero(Map<String, String> values) async {
+    await _heroRepository.createHero(values);
+    await loadData(showLoading: false);
+  }
+
+  Future<void> updateHero(String id, Map<String, String> values) async {
+    await _heroRepository.updateHero(id, values);
+    await loadData(showLoading: false);
+  }
+
+  Future<void> deleteHero(String id) async {
+    await _heroRepository.deleteHero(id);
+    await loadData(showLoading: false);
+  }
 
   void resetFilters() {
     _searchQuery = '';

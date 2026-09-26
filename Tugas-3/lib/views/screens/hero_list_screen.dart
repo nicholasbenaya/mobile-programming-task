@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../controllers/pahlawan_controller.dart';
 import '../../utils/app_theme.dart';
 import '../widgets/hero_card.dart';
 import '../widgets/search_filter_bar.dart';
 import 'hero_list_screen_other.dart';
+import 'hero_admin_screen.dart';
 
 class HeroListScreen extends StatefulWidget {
   const HeroListScreen({super.key});
@@ -25,17 +27,29 @@ class _HeroListScreenState extends State<HeroListScreen> {
       appBar: AppBar(
         title: const Text('Daftar Pahlawan Nasional'),
         actions: [
+          IconButton(
+            tooltip: 'Kelola data pahlawan',
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const HeroAdminScreen())),
+          ),
           if (controller.searchQuery.isNotEmpty ||
               controller.selectedRegion != 'Semua' ||
               controller.selectedEra != 'Semua')
             TextButton.icon(
               onPressed: () => controller.resetFilters(),
-              icon: const Icon(Icons.refresh_rounded,
-                  size: 16, color: AppTheme.primaryRed),
+              icon: const Icon(
+                Icons.refresh_rounded,
+                size: 16,
+                color: AppTheme.primaryRed,
+              ),
               label: const Text(
                 'Reset',
                 style: TextStyle(
-                    color: AppTheme.primaryRed, fontWeight: FontWeight.bold),
+                  color: AppTheme.primaryRed,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
         ],
@@ -100,20 +114,27 @@ class _HeroListScreenState extends State<HeroListScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.search_off_rounded,
-                              size: 64, color: Colors.grey.shade400),
+                          Icon(
+                            Icons.search_off_rounded,
+                            size: 64,
+                            color: Colors.grey.shade400,
+                          ),
                           const SizedBox(height: 16),
                           const Text(
                             'Pahlawan Tidak Ditemukan',
                             style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 6),
                           const Text(
                             'Coba ubah kata kunci pencarian atau reset filter wilayah Anda.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                                color: AppTheme.textMuted, fontSize: 13),
+                              color: AppTheme.textMuted,
+                              fontSize: 13,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton(

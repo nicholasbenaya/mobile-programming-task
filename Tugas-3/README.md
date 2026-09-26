@@ -144,3 +144,50 @@ Keamanan diatur dengan **Row Level Security**: data pahlawan & kuis hanya bisa d
 | `quiz_questions` | 10 soal kuis | Baca |
 | `quiz_options` | Pilihan jawaban tiap soal | Baca |
 | `favorites` | Favorit per pengguna | Baca, tambah, hapus (milik sendiri) |
+
+### Menyiapkan Server Database Supabase
+
+Tugas-3 menggunakan **Supabase Cloud**, sehingga server database tidak dijalankan dengan `flutter run` dan tidak perlu dijalankan dari folder repository. Folder `supabase/` hanya berisi SQL untuk membuat dan mengisi database pada project Supabase.
+
+1. Buka [supabase.com](https://supabase.com), buat akun, lalu buat project baru.
+2. Tunggu sampai project selesai dibuat.
+3. Buka menu **SQL Editor**, jalankan isi `supabase/01_schema.sql` terlebih dahulu.
+4. Jalankan isi `supabase/02_seed_data.sql` setelah schema berhasil dibuat.
+5. Buka **Authentication > Providers**, aktifkan **Anonymous Sign-Ins**.
+6. Buka **Project Settings > API**, salin **Project URL** dan **Publishable key**.
+
+Jalankan aplikasi dari root repository dengan environment variable berikut. Nilai ini diteruskan saat compile dan tidak perlu ditulis ke source code:
+
+PowerShell:
+
+```powershell
+cd Tugas-3
+flutter pub get
+flutter run -d chrome `
+   --dart-define=SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co `
+   --dart-define=SUPABASE_KEY=YOUR_PUBLISHABLE_KEY
+```
+
+Windows Desktop:
+
+```powershell
+cd Tugas-3
+flutter run -d windows `
+   --dart-define=SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co `
+   --dart-define=SUPABASE_KEY=YOUR_PUBLISHABLE_KEY
+```
+
+Alternatifnya, isi nilai URL dan key pada `lib/config/supabase_config.dart`. Jangan memasukkan `service_role` key ke aplikasi Flutter; gunakan hanya Project URL dan Publishable/anon key.
+
+### Menjalankan dan Menguji Tugas-3
+
+Dari root repository:
+
+```powershell
+cd Tugas-3
+flutter pub get
+flutter analyze
+flutter test
+```
+
+Jika aplikasi menampilkan error pemuatan data, periksa URL/key, pastikan kedua file SQL sudah dijalankan, dan pastikan **Anonymous Sign-Ins** aktif. Jika tabel kosong, jalankan ulang `supabase/02_seed_data.sql` setelah memastikan schema sudah tersedia.

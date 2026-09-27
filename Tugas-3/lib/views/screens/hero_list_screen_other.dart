@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/hero_model.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/hero_image.dart';
 import 'hero_detail_screen.dart';
 
 class HeroListScreenOther extends StatelessWidget {
@@ -41,80 +42,73 @@ class _CatalogTile extends StatelessWidget {
   const _CatalogTile({required this.hero});
 
   @override
-Widget build(BuildContext context) {
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(12),
-    child: Stack(
-      fit: StackFit.expand,
-      children: [
-        _buildImage(hero.photoPath),
-        // Nama di bagian bawah foto dengan gradasi gelap
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(8, 20, 8, 8),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black87],
-              ),
-            ),
-            child: Text(
-              hero.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Gambar Pahlawan dengan heroImage + Session Cache
+          heroImage(
+            hero.photoPath,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: Colors.grey.shade200,
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.person,
+                size: 36,
+                color: AppTheme.textMuted,
               ),
             ),
           ),
-        ),
-        // Area tap + efek ripple, diletakkan paling atas
-        Positioned.fill(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => HeroDetailScreen(hero: hero),
-                  ),
-                );
-              },
+
+          // Nama di bagian bawah foto dengan gradasi gelap
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(8, 20, 8, 8),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Colors.black87],
+                ),
+              ),
+              child: Text(
+                hero.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
 
-  Widget _buildImage(String path) {
-    final placeholder = Container(
-      color: Colors.grey.shade200,
-      child: Icon(Icons.person, size: 36, color: AppTheme.textMuted),
-    );
-
-    if (path.isEmpty) return placeholder;
-
-    if (path.startsWith('http')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => placeholder,
-      );
-    }
-    return Image.asset(
-      path,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => placeholder,
+          // Area tap + efek ripple, diletakkan paling atas
+          Positioned.fill(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => HeroDetailScreen(hero: hero),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

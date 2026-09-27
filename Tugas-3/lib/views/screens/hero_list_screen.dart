@@ -7,6 +7,7 @@ import '../widgets/hero_card.dart';
 import '../widgets/search_filter_bar.dart';
 import 'hero_list_screen_other.dart';
 import 'hero_admin_screen.dart';
+import 'hero_favorites_screen.dart';
 
 class HeroListScreen extends StatefulWidget {
   const HeroListScreen({super.key});
@@ -15,11 +16,16 @@ class HeroListScreen extends StatefulWidget {
   State<HeroListScreen> createState() => _HeroListScreenState();
 }
 
-class _HeroListScreenState extends State<HeroListScreen> {
+class _HeroListScreenState extends State<HeroListScreen>
+    with AutomaticKeepAliveClientMixin {
   bool _isCatalogView = false;
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final controller = context.watch<PahlawanController>();
     final heroes = controller.filteredHeroes;
 
@@ -27,6 +33,18 @@ class _HeroListScreenState extends State<HeroListScreen> {
       appBar: AppBar(
         title: const Text('Daftar Pahlawan Nasional'),
         actions: [
+          IconButton(
+            tooltip: 'Pahlawan Favorit',
+            icon: Badge(
+              label: Text('${controller.totalFavorites}'),
+              isLabelVisible: controller.totalFavorites > 0,
+              backgroundColor: AppTheme.primaryRed,
+              child: const Icon(Icons.bookmark_outline_rounded),
+            ),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const HeroFavoritesScreen()),
+            ),
+          ),
           IconButton(
             tooltip: 'Kelola data pahlawan',
             icon: const Icon(Icons.admin_panel_settings_outlined),
@@ -83,6 +101,15 @@ class _HeroListScreenState extends State<HeroListScreen> {
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.primaryRed,
+                          ),
+                        ),
+                      if (controller.searchQuery.isNotEmpty)
+                        Text(
+                          'Pencarian: "${controller.searchQuery}"',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.accentGold,
                           ),
                         ),
                     ],

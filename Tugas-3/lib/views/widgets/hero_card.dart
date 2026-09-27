@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../models/hero_model.dart';
 import '../../controllers/pahlawan_controller.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/hero_image.dart';
 import '../screens/hero_detail_screen.dart';
 
 class HeroCard extends StatelessWidget {
@@ -34,9 +36,7 @@ class HeroCard extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: () {
-            Navigator.of(context).push(
-              HeroDetailScreen.route(hero),
-            );
+            Navigator.of(context).push(HeroDetailScreen.route(hero));
           },
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -62,11 +62,15 @@ class HeroCard extends StatelessWidget {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(14),
-                      child: Image.asset(
+                      child: heroImage(
                         hero.photoPath,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Center(
-                          child: Icon(Icons.person, color: Colors.grey.shade400, size: 36),
+                          child: Icon(
+                            Icons.person,
+                            color: Colors.grey.shade400,
+                            size: 36,
+                          ),
                         ),
                       ),
                     ),
@@ -112,13 +116,19 @@ class HeroCard extends StatelessWidget {
                           // Bookmark Favorit
                           IconButton(
                             icon: Icon(
-                              isFav ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                              color: isFav ? AppTheme.primaryRed : Colors.grey.shade400,
+                              isFav
+                                  ? Icons.bookmark_rounded
+                                  : Icons.bookmark_border_rounded,
+                              color: isFav
+                                  ? AppTheme.primaryRed
+                                  : Colors.grey.shade400,
                               size: 22,
                             ),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
-                            tooltip: isFav ? 'Hapus dari favorit' : 'Simpan favorit',
+                            tooltip: isFav
+                                ? 'Hapus dari favorit'
+                                : 'Simpan favorit',
                             onPressed: () => controller.toggleFavorite(hero.id),
                           ),
                         ],
@@ -128,7 +138,11 @@ class HeroCard extends StatelessWidget {
                       // Badge Daerah Asal
                       Row(
                         children: [
-                          Icon(Icons.place_rounded, size: 14, color: AppTheme.primaryRed.withValues(alpha: 0.8)),
+                          Icon(
+                            Icons.place_rounded,
+                            size: 14,
+                            color: AppTheme.primaryRed.withValues(alpha: 0.8),
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
@@ -149,7 +163,11 @@ class HeroCard extends StatelessWidget {
                       // Badge Masa Hidup (Lifetime) & Era
                       Row(
                         children: [
-                          Icon(Icons.calendar_today_rounded, size: 13, color: AppTheme.textMuted),
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 13,
+                            color: AppTheme.textMuted,
+                          ),
                           const SizedBox(width: 5),
                           Text(
                             hero.lifeTimeYears,
@@ -161,9 +179,14 @@ class HeroCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryRed.withValues(alpha: 0.08),
+                              color: AppTheme.primaryRed.withValues(
+                                alpha: 0.08,
+                              ),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(

@@ -73,32 +73,43 @@ class HeroRepository {
 
   /// GET favorit milik pengguna yang sedang login (dibatasi oleh RLS).
   Future<Set<String>> getFavoriteIds() async {
-    await SupabaseService.ensureSignedIn();
-    final List<Map<String, dynamic>> rows = await _client
-        .from('favorites')
-        .select('hero_id');
-    return rows.map((r) => r['hero_id'] as String).toSet();
+    try {
+      final userId = await SupabaseService.ensureSignedIn();
+      if (userId == null) return {};
+      final List<Map<String, dynamic>> rows = await _client
+          .from('favorites')
+          .select('hero_id');
+      return rows.map((r) => r['hero_id'] as String).toSet();
+    } catch (_) {
+      return {};
+    }
   }
 
   /// POST favorit baru. user_id diisi otomatis oleh database (auth.uid()).
   Future<void> addFavorite(String heroId) async {
-    await SupabaseService.ensureSignedIn();
-    await _client
-        .from('favorites')
-        .upsert(
-          {'hero_id': heroId},
-          onConflict: 'user_id,hero_id',
-          ignoreDuplicates: true,
-        );
+    try {
+      final userId = await SupabaseService.ensureSignedIn();
+      if (userId == null) return;
+      await _client
+          .from('favorites')
+          .upsert(
+            {'hero_id': heroId, 'user_id': userId},
+            onConflict: 'user_id,hero_id',
+            ignoreDuplicates: true,
+          );
+    } catch (_) {}
   }
 
   /// DELETE favorit.
   Future<void> removeFavorite(String heroId) async {
-    final userId = await SupabaseService.ensureSignedIn();
-    await _client
-        .from('favorites')
-        .delete()
-        .eq('user_id', userId)
-        .eq('hero_id', heroId);
+    try {
+      final userId = await SupabaseService.ensureSignedIn();
+      if (userId == null) return;
+      await _client
+          .from('favorites')
+          .delete()
+          .eq('user_id', userId)
+          .eq('hero_id', heroId);
+    } catch (_) {}
   }
 }

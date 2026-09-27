@@ -26,11 +26,16 @@ class SupabaseService {
   /// favoritnya tersimpan di server & terpisah dari pengguna lain.
   /// Sesi disimpan otomatis, jadi pengguna yang sama tetap dikenali
   /// walaupun aplikasi ditutup lalu dibuka lagi.
-  static Future<String> ensureSignedIn() async {
+  static Future<String?> ensureSignedIn() async {
     final auth = client.auth;
-    if (auth.currentUser == null) {
-      await auth.signInAnonymously();
+    if (auth.currentUser != null) {
+      return auth.currentUser!.id;
     }
-    return auth.currentUser!.id;
+    try {
+      final res = await auth.signInAnonymously();
+      return res.user?.id ?? auth.currentUser?.id;
+    } catch (_) {
+      return null;
+    }
   }
 }

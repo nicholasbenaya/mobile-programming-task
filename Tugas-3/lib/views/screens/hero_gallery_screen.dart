@@ -5,11 +5,21 @@ import '../../utils/app_theme.dart';
 import '../widgets/gallery_card.dart';
 import '../widgets/search_filter_bar.dart';
 
-class HeroGalleryScreen extends StatelessWidget {
+class HeroGalleryScreen extends StatefulWidget {
   const HeroGalleryScreen({super.key});
 
   @override
+  State<HeroGalleryScreen> createState() => _HeroGalleryScreenState();
+}
+
+class _HeroGalleryScreenState extends State<HeroGalleryScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final controller = context.watch<PahlawanController>();
     final heroes = controller.filteredHeroes;
 

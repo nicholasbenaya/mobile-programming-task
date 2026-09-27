@@ -16,6 +16,14 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  List<Widget>? _screens;
+
+  List<Widget> get _cachedScreens => _screens ??= [
+        DashboardScreen(onNavigateTab: _onSelectTab),
+        const HeroListScreen(),
+        const HeroGalleryScreen(),
+        const HeroQuizScreen(),
+      ];
 
   void _onSelectTab(int index) {
     setState(() {
@@ -76,17 +84,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
 
     // 3) Data siap -> tampilkan aplikasi seperti biasa
-    final screens = [
-      DashboardScreen(onNavigateTab: _onSelectTab),
-      const HeroListScreen(),
-      const HeroGalleryScreen(),
-      const HeroQuizScreen(),
-    ];
-
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: screens,
+        children: _cachedScreens,
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,

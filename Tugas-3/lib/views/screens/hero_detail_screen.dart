@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../models/hero_model.dart';
 import '../../controllers/pahlawan_controller.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/hero_image.dart';
 import '../widgets/hero_photo_dialog.dart';
 
 class HeroDetailScreen extends StatefulWidget {
@@ -262,7 +263,7 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                                     children: [
                                       Hero(
                                         tag: 'hero_photo_${hero.id}',
-                                        child: Image.asset(
+                                        child: heroImage(
                                           hero.photoPath,
                                           fit: BoxFit.contain, // Foto UTUH dan tidak ngezoom
                                           errorBuilder:
@@ -1313,7 +1314,7 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
   }
 }
 
-class _HoverableDetailTab extends StatefulWidget {
+class _HoverableDetailTab extends StatelessWidget {
   final IconData icon;
   final String title;
   final bool isSelected;
@@ -1327,40 +1328,24 @@ class _HoverableDetailTab extends StatefulWidget {
   });
 
   @override
-  State<_HoverableDetailTab> createState() => _HoverableDetailTabState();
-}
-
-class _HoverableDetailTabState extends State<_HoverableDetailTab> {
-  bool _isHovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    final isHighlighted = widget.isSelected || _isHovered;
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: widget.isSelected
-                ? Colors.white
-                : _isHovered
-                ? Colors.white.withValues(alpha: 0.72)
-                : Colors.transparent,
+            color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
-            boxShadow: isHighlighted
+            boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: widget.isSelected
-                          ? Colors.black.withValues(alpha: 0.08)
-                          : AppTheme.primaryRed.withValues(alpha: 0.16),
-                      blurRadius: widget.isSelected ? 8 : 10,
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
                   ]
@@ -1370,26 +1355,20 @@ class _HoverableDetailTabState extends State<_HoverableDetailTab> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                widget.icon,
+                icon,
                 size: 16,
-                color: widget.isSelected || _isHovered
-                    ? AppTheme.primaryRed
-                    : AppTheme.textMuted,
+                color: isSelected ? AppTheme.primaryRed : AppTheme.textMuted,
               ),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  widget.title,
+                  title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: widget.isSelected || _isHovered
-                        ? FontWeight.bold
-                        : FontWeight.w500,
-                    color: widget.isSelected || _isHovered
-                        ? AppTheme.primaryRed
-                        : AppTheme.textMuted,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? AppTheme.primaryRed : AppTheme.textMuted,
                   ),
                 ),
               ),

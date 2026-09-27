@@ -8,6 +8,10 @@ import 'views/screens/main_navigation_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Memperbesar kapasitas image cache bawaan Flutter untuk seluruh sesi
+  PaintingBinding.instance.imageCache.maximumSize = 2500;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 250 << 20; // 250 MB
+
   String? startupError;
   try {
     await SupabaseService.initialize();

@@ -62,6 +62,47 @@ class _HeroEditorScreenState extends State<HeroEditorScreen> {
   String? _required(String? value) =>
       value == null || value.trim().isEmpty ? 'Wajib diisi' : null;
 
+  void _fillDummyData() {
+    final dummy = {
+      'id': 'bung_tomo',
+      'name': 'Sutomo',
+      'known_as': 'Bung Tomo',
+      'origin_city': 'Surabaya',
+      'origin_province': 'Jawa Timur',
+      'region_group': 'Jawa',
+      'birth_date': '3 Oktober 1920',
+      'birth_place': 'Surabaya',
+      'death_date': '7 Oktober 1981',
+      'death_place': 'Padang Arafah, Arab Saudi',
+      'age_at_death': '61',
+      'photo_path': 'assets/images/placeholder.png',
+      'short_bio':
+          'Pemimpin perlawanan rakyat Surabaya dalam Pertempuran 10 November 1945 melalui siaran radio yang membakar semangat juang.',
+      'full_bio':
+          'Sutomo yang lebih dikenal dengan panggilan Bung Tomo adalah pahlawan nasional Indonesia yang terkenal karena perannya dalam membangkitkan semangat rakyat untuk melawan kembalinya penjajah Belanda melalui tentara NICA, yang memuncak pada peristiwa Pertempuran 10 November 1945 di Surabaya. Semboyan terkenalnya adalah "Merdeka atau Mati!".',
+      'struggle_era': 'Perang Kemerdekaan (1945–1949)',
+      'famous_quote':
+          'Selama banteng-banteng Indonesia masih mempunyai darah merah yang dapat membikin secarik kain putih merah dan putih, maka selama itu tidak akan kita mau menyerah kepada siapa pun juga. Merdeka atau mati!',
+      'quote_context':
+          'Pidato siaran Radio Pemberontakan Surabaya menjelang 10 November 1945',
+      'decree_number': 'Keppres No. 041/TK/Tahun 2008',
+      'burial_place': 'TPU Ngagel, Surabaya, Jawa Timur',
+    };
+
+    setState(() {
+      for (final entry in dummy.entries) {
+        _fields[entry.key]?.text = entry.value;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Formulir berhasil diisi dengan data contoh (Bung Tomo).'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final values = <String, String>{
@@ -116,6 +157,17 @@ class _HeroEditorScreenState extends State<HeroEditorScreen> {
         title: Text(
           widget.isEditing ? 'Edit Data Pahlawan' : 'Tambah Pahlawan',
         ),
+        actions: [
+          if (!widget.isEditing)
+            TextButton.icon(
+              icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
+              label: const Text('Isi Contoh'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.accentGold,
+              ),
+              onPressed: _fillDummyData,
+            ),
+        ],
       ),
       body: Form(
         key: _formKey,

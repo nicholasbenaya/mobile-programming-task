@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../../models/hero_model.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/hero_image.dart';
 import '../screens/hero_detail_screen.dart';
 import 'hero_photo_dialog.dart';
 
@@ -30,20 +32,22 @@ class GalleryCard extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: () {
-              Navigator.of(context).push(
-                HeroDetailScreen.route(hero),
-              );
+              Navigator.of(context).push(HeroDetailScreen.route(hero));
             },
             child: Stack(
               fit: StackFit.expand,
               children: [
                 // Gambar Utama
-                Image.asset(
+                heroImage(
                   hero.photoPath,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
                     color: Colors.grey.shade200,
-                    child: const Icon(Icons.person, size: 50, color: Colors.grey),
+                    child: const Icon(
+                      Icons.person,
+                      size: 50,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
 
@@ -83,7 +87,11 @@ class GalleryCard extends StatelessWidget {
                       },
                       child: const Padding(
                         padding: EdgeInsets.all(6),
-                        child: Icon(Icons.fullscreen_rounded, color: Colors.white, size: 20),
+                        child: Icon(
+                          Icons.fullscreen_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),
@@ -94,7 +102,10 @@ class GalleryCard extends StatelessWidget {
                   top: 8,
                   left: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryRed.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(10),
@@ -129,17 +140,18 @@ class GalleryCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           height: 1.2,
                           shadows: [
-                            Shadow(
-                              color: Colors.black54,
-                              blurRadius: 4,
-                            ),
+                            Shadow(color: Colors.black54, blurRadius: 4),
                           ],
                         ),
                       ),
                       const SizedBox(height: 3),
                       Row(
                         children: [
-                          const Icon(Icons.location_pin, size: 12, color: Colors.white70),
+                          const Icon(
+                            Icons.location_pin,
+                            size: 12,
+                            color: Colors.white70,
+                          ),
                           const SizedBox(width: 3),
                           Expanded(
                             child: Text(
@@ -157,7 +169,11 @@ class GalleryCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          const Icon(Icons.history_rounded, size: 12, color: AppTheme.accentGold),
+                          const Icon(
+                            Icons.history_rounded,
+                            size: 12,
+                            color: AppTheme.accentGold,
+                          ),
                           const SizedBox(width: 3),
                           Text(
                             hero.lifeTimeYears,

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/comment_model.dart';
 import '../models/hero_model.dart';
 import '../services/supabase_service.dart';
 
@@ -73,32 +74,91 @@ class HeroRepository {
 
   /// GET favorit milik pengguna yang sedang login (dibatasi oleh RLS).
   Future<Set<String>> getFavoriteIds() async {
-    await SupabaseService.ensureSignedIn();
-    final List<Map<String, dynamic>> rows = await _client
-        .from('favorites')
-        .select('hero_id');
-    return rows.map((r) => r['hero_id'] as String).toSet();
+    try {
+      final userId = await SupabaseService.ensureSignedIn();
+      if (userId == null) return {};
+      final List<Map<String, dynamic>> rows = await _client
+          .from('favorites')
+          .select('hero_id');
+      return rows.map((r) => r['hero_id'] as String).toSet();
+    } catch (_) {
+      return {};
+    }
   }
 
   /// POST favorit baru. user_id diisi otomatis oleh database (auth.uid()).
   Future<void> addFavorite(String heroId) async {
-    await SupabaseService.ensureSignedIn();
-    await _client
-        .from('favorites')
-        .upsert(
-          {'hero_id': heroId},
-          onConflict: 'user_id,hero_id',
-          ignoreDuplicates: true,
-        );
+    try {
+      final userId = await SupabaseService.ensureSignedIn();
+      if (userId == null) return;
+      await _client
+          .from('favorites')
+          .upsert(
+            {'hero_id': heroId, 'user_id': userId},
+            onConflict: 'user_id,hero_id',
+            ignoreDuplicates: true,
+          );
+    } catch (_) {}
   }
 
   /// DELETE favorit.
   Future<void> removeFavorite(String heroId) async {
-    final userId = await SupabaseService.ensureSignedIn();
-    await _client
-        .from('favorites')
-        .delete()
-        .eq('user_id', userId)
-        .eq('hero_id', heroId);
+    try {
+      final userId = await SupabaseService.ensureSignedIn();
+      if (userId == null) return;
+      await _client
+          .from('favorites')
+          .delete()
+          .eq('user_id', userId)
+          .eq('hero_id', heroId);
+    } catch (_) {}
+  }
+
+  // ------------------------- KOMENTAR -------------------------
+
+  /// GET daftar komentar untuk pahlawan tertentu, diurutkan dari yang terbaru.
+  Future<List<CommentModel>> getComments(String heroId) async {
+    try {
+      final List<Map<String, dynamic>> rows = await _client
+          .from('hero_comments')
+          .select()
+          .eq('hero_id', heroId)
+          .order('created_at', ascending: false);
+
+      return rows.map(CommentModel.fromMap).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// POST komentar baru untuk pahlawan tertentu.
+  Future<CommentModel?> addComment({
+    required String heroId,
+    required String userName,
+    required String content,
+  }) async {
+    try {
+      final Map<String, dynamic> row = await _client
+          .from('hero_comments')
+          .insert({
+            'hero_id': heroId,
+            'user_name': userName.trim().isEmpty ? 'Pengunjung' : userName.trim(),
+            'content': content.trim(),
+          })
+          .select()
+          .single();
+
+      return CommentModel.fromMap(row);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// DELETE komentar berdasarkan id.
+  Future<void> deleteComment(String commentId) async {
+    try {
+      await _client.from('hero_comments').delete().eq('id', commentId);
+    } catch (_) {}
   }
 }
+

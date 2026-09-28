@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/comment_model.dart';
 import '../../models/hero_model.dart';
 import '../../controllers/pahlawan_controller.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/hero_image.dart';
 import '../widgets/hero_photo_dialog.dart';
 
 class HeroDetailScreen extends StatefulWidget {
@@ -49,8 +51,12 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
   int _activeTabIndex =
-      0; // 0: Linimasa & Data, 1: Kisah Biografi, 2: Jasa & Warisan
+      0; // 0: Linimasa & Data, 1: Kisah Biografi, 2: Jasa & Warisan, 3: Komentar
   int _saluteCount = 0;
+
+  final _commentNameController = TextEditingController();
+  final _commentTextController = TextEditingController();
+  bool _isSubmittingComment = false;
 
   @override
   void initState() {
@@ -68,10 +74,18 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
           CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
         );
     _animController.forward();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<PahlawanController>().fetchComments(widget.hero.id);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _commentNameController.dispose();
+    _commentTextController.dispose();
     _animController.dispose();
     super.dispose();
   }
@@ -262,7 +276,7 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                                     children: [
                                       Hero(
                                         tag: 'hero_photo_${hero.id}',
-                                        child: Image.asset(
+                                        child: heroImage(
                                           hero.photoPath,
                                           fit: BoxFit.contain, // Foto UTUH dan tidak ngezoom
                                           errorBuilder:
@@ -453,12 +467,18 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
                                   ),
                                 );
                               },
-                              child: _buildActiveTabContent(hero),
+                              child: _buildActiveTabContent(hero, controller),
                             ),
                             const SizedBox(height: 20),
 
                             // 5. SK Penetapan & Persemayaman Card
                             _buildDecreeAndRestingPlaceCard(hero),
+
+                            // 6. Pintasan Cepat ke Tab Komentar (jika sedang tidak membuka tab komentar)
+                            if (_activeTabIndex != 3) ...[
+                              const SizedBox(height: 16),
+                              _buildCommentShortcutCard(controller, hero),
+                            ],
                           ],
                         ),
                       ),
@@ -569,27 +589,33 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
             child: Icon(icon, color: color, size: 16),
           ),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.textMuted,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textMuted,
+                  ),
                 ),
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.deepNavy,
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.deepNavy,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -598,14 +624,22 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
 
   /// Segmented Tab Selector Interaktif & Dinamis
   Widget _buildDynamicTabSelector() {
+    final commentCount = context.select<PahlawanController, int>(
+      (c) => c.getCommentCount(widget.hero.id),
+    );
+
     final tabs = [
-      {'title': 'Linimasa & Data', 'icon': Icons.timeline_rounded},
-      {'title': 'Biografi Lengkap', 'icon': Icons.menu_book_rounded},
-      {'title': 'Jasa Perjuangan', 'icon': Icons.military_tech_rounded},
+      {'title': 'Linimasa', 'icon': Icons.timeline_rounded},
+      {'title': 'Biografi', 'icon': Icons.menu_book_rounded},
+      {'title': 'Jasa', 'icon': Icons.military_tech_rounded},
+      {
+        'title': commentCount > 0 ? 'Komentar ($commentCount)' : 'Komentar',
+        'icon': Icons.chat_bubble_outline_rounded,
+      },
     ];
 
     return Container(
-      padding: const EdgeInsets.all(5),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: Colors.grey.shade200.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(18),
@@ -632,7 +666,7 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
   }
 
   /// Konten Tab yang Dipilih
-  Widget _buildActiveTabContent(HeroModel hero) {
+  Widget _buildActiveTabContent(HeroModel hero, PahlawanController controller) {
     switch (_activeTabIndex) {
       case 0:
         return KeyedSubtree(
@@ -645,10 +679,15 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
           child: _buildFullBiographyView(hero),
         );
       case 2:
-      default:
         return KeyedSubtree(
           key: const ValueKey<int>(2),
           child: _buildContributionsView(hero),
+        );
+      case 3:
+      default:
+        return KeyedSubtree(
+          key: const ValueKey<int>(3),
+          child: _buildCommentsView(hero, controller),
         );
     }
   }
@@ -1195,6 +1234,513 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
     );
   }
 
+  /// Pintasan Cepat ke Tab Komentar dari Halaman Detail
+  Widget _buildCommentShortcutCard(
+    PahlawanController controller,
+    HeroModel hero,
+  ) {
+    final count = controller.getCommentCount(hero.id);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.accentGold.withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.accentGold.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.forum_outlined,
+              color: Color(0xFF946200),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  count > 0 ? '$count Komentar Pengunjung' : 'Belum Ada Komentar',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                    color: AppTheme.deepNavy,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Tinggalkan doa atau rasa terima kasih Anda',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryRed.withValues(alpha: 0.1),
+              foregroundColor: AppTheme.primaryRed,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              setState(() {
+                _activeTabIndex = 3;
+              });
+            },
+            icon: const Icon(Icons.edit_note_rounded, size: 16),
+            label: const Text(
+              'Tulis',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// TAB 4: Fitur Komentar & Jejak Doa Pengunjung
+  Widget _buildCommentsView(HeroModel hero, PahlawanController controller) {
+    final comments = controller.getCommentsForHero(hero.id);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Tab Komentar
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryRed.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.forum_rounded,
+                  color: AppTheme.primaryRed,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Pesan & Jejak Doa',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.deepNavy,
+                      ),
+                    ),
+                    Text(
+                      'Sampaikan penghormatan untuk ${hero.knownAs.isNotEmpty ? hero.knownAs : hero.name}',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentGold.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AppTheme.accentGold.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Text(
+                  '${comments.length} Pesan',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF8C5800),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 28),
+
+          // Formulir Tulis Komentar Sederhana
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFBF8F5),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.edit_note_rounded, size: 18, color: AppTheme.primaryRed),
+                    SizedBox(width: 6),
+                    Text(
+                      'Tulis Komentar Baru',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                        color: AppTheme.deepNavy,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Field Nama
+                TextField(
+                  controller: _commentNameController,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    hintText: 'Nama Anda (opsional, contoh: Budi)',
+                    hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
+                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 20, color: Colors.black45),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.primaryRed, width: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                // Field Komentar
+                TextField(
+                  controller: _commentTextController,
+                  maxLines: 3,
+                  minLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'Tuliskan kesan, pesan, atau doa untuk pahlawan ini...',
+                    hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black38),
+                    prefixIcon: const Padding(
+                      padding: EdgeInsets.only(bottom: 24),
+                      child: Icon(Icons.chat_bubble_outline_rounded, size: 20, color: Colors.black45),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.primaryRed, width: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryRed,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: _isSubmittingComment
+                        ? null
+                        : () async {
+                            final content = _commentTextController.text.trim();
+                            if (content.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Silakan tuliskan komentar atau pesan terlebih dahulu.'),
+                                  behavior: SnackBarBehavior.floating,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              return;
+                            }
+
+                            FocusScope.of(context).unfocus();
+                            setState(() {
+                              _isSubmittingComment = true;
+                            });
+
+                            final name = _commentNameController.text.trim();
+                            await controller.addComment(
+                              heroId: hero.id,
+                              userName: name,
+                              content: content,
+                            );
+
+                            _commentTextController.clear();
+
+                            if (mounted) {
+                              setState(() {
+                                _isSubmittingComment = false;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Row(
+                                    children: [
+                                      Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text('Komentar berhasil ditambahkan! Terima kasih atas penghormatan Anda.'),
+                                      ),
+                                    ],
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                    icon: _isSubmittingComment
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.send_rounded, size: 16),
+                    label: Text(
+                      _isSubmittingComment ? 'Mengirim...' : 'Kirim Komentar',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Daftar Komentar Pengunjung
+          if (comments.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.mark_chat_unread_outlined,
+                      size: 44,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Belum ada komentar',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: AppTheme.deepNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Jadilah yang pertama menuliskan pesan atau doa penghormatan!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: comments.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final comment = comments[index];
+                return _buildCommentTile(hero, comment, controller);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Kartu Ulasan / Komentar Individual
+  Widget _buildCommentTile(
+    HeroModel hero,
+    CommentModel comment,
+    PahlawanController controller,
+  ) {
+    final initial = comment.userName.isNotEmpty
+        ? comment.userName[0].toUpperCase()
+        : 'P';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: AppTheme.primaryRed.withValues(alpha: 0.12),
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    color: AppTheme.primaryRed,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      comment.userName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: AppTheme.deepNavy,
+                      ),
+                    ),
+                    Text(
+                      comment.timeAgo,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Tombol hapus komentar
+              IconButton(
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  size: 18,
+                  color: Colors.black38,
+                ),
+                tooltip: 'Hapus Komentar',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (dialogCtx) => AlertDialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: const Text('Hapus Komentar?'),
+                      content: const Text(
+                        'Apakah Anda yakin ingin menghapus pesan komentar ini?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogCtx).pop(),
+                          child: const Text('Batal'),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppTheme.primaryRed,
+                          ),
+                          onPressed: () {
+                            Navigator.of(dialogCtx).pop();
+                            controller.deleteComment(hero.id, comment.id);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Komentar berhasil dihapus.'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          child: const Text('Hapus'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            comment.content,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF2D3748),
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Floating Action Dock Modern di Bawah Layar
   Widget _buildFloatingActionDock(
     BuildContext context,
@@ -1307,13 +1853,54 @@ class _HeroDetailScreenState extends State<HeroDetailScreen>
               ),
             ),
           ),
+          const SizedBox(width: 8),
+
+          // Tombol Pintas Tab Komentar
+          Container(
+            decoration: BoxDecoration(
+              color: _activeTabIndex == 3
+                  ? AppTheme.accentGold
+                  : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _activeTabIndex == 3
+                    ? AppTheme.accentGold
+                    : Colors.grey.shade300,
+              ),
+            ),
+            child: IconButton(
+              icon: Badge(
+                isLabelVisible: controller.getCommentCount(hero.id) > 0,
+                label: Text(
+                  '${controller.getCommentCount(hero.id)}',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                child: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: _activeTabIndex == 3
+                      ? const Color(0xFF650005)
+                      : AppTheme.deepNavy,
+                  size: 19,
+                ),
+              ),
+              tooltip: 'Buka Komentar',
+              onPressed: () {
+                setState(() {
+                  _activeTabIndex = 3;
+                });
+              },
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _HoverableDetailTab extends StatefulWidget {
+class _HoverableDetailTab extends StatelessWidget {
   final IconData icon;
   final String title;
   final bool isSelected;
@@ -1327,40 +1914,24 @@ class _HoverableDetailTab extends StatefulWidget {
   });
 
   @override
-  State<_HoverableDetailTab> createState() => _HoverableDetailTabState();
-}
-
-class _HoverableDetailTabState extends State<_HoverableDetailTab> {
-  bool _isHovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    final isHighlighted = widget.isSelected || _isHovered;
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
           decoration: BoxDecoration(
-            color: widget.isSelected
-                ? Colors.white
-                : _isHovered
-                ? Colors.white.withValues(alpha: 0.72)
-                : Colors.transparent,
+            color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
-            boxShadow: isHighlighted
+            boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: widget.isSelected
-                          ? Colors.black.withValues(alpha: 0.08)
-                          : AppTheme.primaryRed.withValues(alpha: 0.16),
-                      blurRadius: widget.isSelected ? 8 : 10,
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
                   ]
@@ -1370,26 +1941,20 @@ class _HoverableDetailTabState extends State<_HoverableDetailTab> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                widget.icon,
-                size: 16,
-                color: widget.isSelected || _isHovered
-                    ? AppTheme.primaryRed
-                    : AppTheme.textMuted,
+                icon,
+                size: 15,
+                color: isSelected ? AppTheme.primaryRed : AppTheme.textMuted,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Flexible(
                 child: Text(
-                  widget.title,
+                  title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: widget.isSelected || _isHovered
-                        ? FontWeight.bold
-                        : FontWeight.w500,
-                    color: widget.isSelected || _isHovered
-                        ? AppTheme.primaryRed
-                        : AppTheme.textMuted,
+                    fontSize: 11.5,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? AppTheme.primaryRed : AppTheme.textMuted,
                   ),
                 ),
               ),
@@ -1400,3 +1965,4 @@ class _HoverableDetailTabState extends State<_HoverableDetailTab> {
     );
   }
 }
+

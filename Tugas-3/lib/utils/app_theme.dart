@@ -1,23 +1,43 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Indonesian Patriotic Palette (Merah Putih & Emas Nusantara)
-  static const Color primaryRed = Color(0xFFBA1A1A);
-  static const Color darkRed = Color(0xFF93000A);
-  static const Color lightRed = Color(0xFFFFDAD6);
-  static const Color accentGold = Color(0xFFD4AF37);
-  static const Color warmAmber = Color(0xFFB45309);
-  static const Color deepNavy = Color(0xFF1E293B);
-  static const Color backgroundLight = Color(0xFFFBF9F7);
+  // ==============================================================
+  // PALET WARNA: "Zamrud & Emas Nusantara" (Royal Emerald Teal & Antique Gold)
+  // Palet prestisius, terinspirasi dari julukan "Zamrud Khatulistiwa"
+  // dan emas pusaka kemerdekaan. Unik & elegan, jauh dari warna klise.
+  // ==============================================================
+
+  // Warna Utama (Deep Royal Emerald Teal)
+  static const Color primary = Color(0xFF0F4C5C); // Deep Emerald Teal
+  static const Color primaryDark = Color(0xFF09313C);
+  static const Color primaryLight = Color(0xFFE2EFF2);
+  static const Color primaryContainer = Color(0xFFD3E7EB);
+
+  // Aksen Emas & Amber (Antique Royal Gold)
+  static const Color accentGold = Color(0xFFC59B27); // Emas Pusaka
+  static const Color lightGold = Color(0xFFFBF5E5);
+  static const Color warmAmber = Color(0xFFD97706); // Amber Hangat
+
+  // Netral & Latar Belakang (Alabaster & Obsidian Slate)
+  static const Color deepNavy = Color(0xFF0F172A); // Slate Obsidian
+  static const Color backgroundLight = Color(0xFFF7F9F9); // Alabaster Halus
   static const Color cardLight = Colors.white;
-  static const Color textDark = Color(0xFF1E293B);
+  static const Color textDark = Color(0xFF0F172A);
   static const Color textMuted = Color(0xFF64748B);
+
+  // Aksen Merah Delima (Subtle Patriotic Ruby)
+  static const Color crimsonAccent = Color(0xFFBE123C);
+
+  // Alias kompatibilitas (agar seluruh kode yang memanggil primaryRed tetap berjalan mulus dengan tema baru)
+  static const Color primaryRed = primary;
+  static const Color darkRed = primaryDark;
+  static const Color lightRed = primaryLight;
 
   static ThemeData get lightTheme {
     final baseScheme = ColorScheme.fromSeed(
-      seedColor: primaryRed,
-      primary: primaryRed,
-      secondary: warmAmber,
+      seedColor: primary,
+      primary: primary,
+      secondary: accentGold,
       surface: backgroundLight,
       brightness: Brightness.light,
     );
@@ -32,19 +52,19 @@ class AppTheme {
         foregroundColor: deepNavy,
         elevation: 0,
         centerTitle: false,
-        scrolledUnderElevation: 2,
+        scrolledUnderElevation: 1,
         iconTheme: IconThemeData(color: deepNavy),
         titleTextStyle: TextStyle(
           color: deepNavy,
-          fontSize: 20,
+          fontSize: 19,
           fontWeight: FontWeight.bold,
-          letterSpacing: -0.5,
+          letterSpacing: -0.3,
         ),
       ),
       cardTheme: CardThemeData(
         color: cardLight,
         elevation: 2,
-        shadowColor: Colors.black.withValues(alpha: 0.06),
+        shadowColor: primary.withValues(alpha: 0.08),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -52,13 +72,13 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: Colors.white,
         elevation: 3,
-        indicatorColor: primaryRed.withValues(alpha: 0.12),
-        labelTextStyle: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        indicatorColor: primary.withValues(alpha: 0.14),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: primaryRed,
+              color: primary,
             );
           }
           return const TextStyle(
@@ -82,7 +102,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: primaryRed, width: 2),
+          borderSide: const BorderSide(color: primary, width: 2),
         ),
       ),
     );

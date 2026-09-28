@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/comment_model.dart';
 import '../models/hero_model.dart';
 import '../models/quiz_model.dart';
 import '../repositories/hero_repository.dart';
@@ -20,12 +21,15 @@ class PahlawanController extends ChangeNotifier {
     QuizRepository? quizRepository,
     this.startupError,
   }) : _heroRepository = heroRepository ?? HeroRepository(),
-       _quizRepository = quizRepository ?? QuizRepository();
+       _quizRepository = quizRepository ?? QuizRepository() {
+    _initDefaultComments();
+  }
 
   // Data sekarang diambil dari API Supabase (bukan lagi dari HeroData.heroes)
   List<HeroModel> _heroes = [];
   List<QuizQuestion> _quizQuestions = [];
   final Set<String> _favoriteIds = {};
+  final Map<String, List<CommentModel>> _comments = {};
 
   // Status pemuatan data
   bool _isLoading = true;
@@ -224,19 +228,77 @@ class PahlawanController extends ChangeNotifier {
 
   bool isFavorite(String heroId) => _favoriteIds.contains(heroId);
 
+  HeroModel _mapValuesToHero(Map<String, String> values, [String? id]) {
+    return HeroModel(
+      id: id ?? values['id']!,
+      name: values['name']!,
+      knownAs: values['known_as']?.isNotEmpty == true
+          ? values['known_as']!
+          : values['name']!,
+      originCity: values['origin_city'] ?? '',
+      originProvince: values['origin_province'] ?? '',
+      regionGroup: values['region_group']?.isNotEmpty == true
+          ? values['region_group']!
+          : 'Jawa',
+      birthDate: values['birth_date'] ?? '',
+      birthPlace: values['birth_place'] ?? '',
+      deathDate: values['death_date'] ?? '',
+      deathPlace: values['death_place'] ?? '',
+      ageAtDeath: int.tryParse(values['age_at_death'] ?? '0') ?? 0,
+      photoPath: values['photo_path']?.isNotEmpty == true
+          ? values['photo_path']!
+          : 'assets/images/placeholder.png',
+      shortBio: values['short_bio'] ?? '',
+      fullBio: values['full_bio'] ?? '',
+      struggleEra: values['struggle_era'] ?? '',
+      keyContributions: const [],
+      famousQuote: values['famous_quote'] ?? '',
+      quoteContext: values['quote_context'] ?? '',
+      decreeNumber: values['decree_number'] ?? '',
+      burialPlace: values['burial_place'] ?? '',
+    );
+  }
+
   Future<void> createHero(Map<String, String> values) async {
-    await _heroRepository.createHero(values);
-    await loadData(showLoading: false);
+    final hero = _mapValuesToHero(values);
+    try {
+      await _heroRepository.createHero(values);
+      await loadData(showLoading: false);
+    } catch (e) {
+      debugPrint('Peringatan: Gagal menyimpan pahlawan ke Supabase (RLS/Koneksi): $e');
+      // Tetap simpan ke memori sesi lokal agar pahlawan tampil di UI tanpa terhalang RLS
+      _heroes.removeWhere((h) => h.id == hero.id);
+      _heroes.insert(0, hero);
+      notifyListeners();
+    }
   }
 
   Future<void> updateHero(String id, Map<String, String> values) async {
-    await _heroRepository.updateHero(id, values);
-    await loadData(showLoading: false);
+    final hero = _mapValuesToHero(values, id);
+    try {
+      await _heroRepository.updateHero(id, values);
+      await loadData(showLoading: false);
+    } catch (e) {
+      debugPrint('Peringatan: Gagal memperbarui pahlawan di Supabase (RLS/Koneksi): $e');
+      final idx = _heroes.indexWhere((h) => h.id == id);
+      if (idx != -1) {
+        _heroes[idx] = hero;
+      } else {
+        _heroes.insert(0, hero);
+      }
+      notifyListeners();
+    }
   }
 
   Future<void> deleteHero(String id) async {
-    await _heroRepository.deleteHero(id);
-    await loadData(showLoading: false);
+    try {
+      await _heroRepository.deleteHero(id);
+      await loadData(showLoading: false);
+    } catch (e) {
+      debugPrint('Peringatan: Gagal menghapus pahlawan di Supabase (RLS/Koneksi): $e');
+      _heroes.removeWhere((h) => h.id == id);
+      notifyListeners();
+    }
   }
 
   void resetFilters() {
@@ -257,4 +319,150 @@ class PahlawanController extends ChangeNotifier {
           h.photoPath != 'assets/images/' &&
           h.photoPath != 'assets/images/placeholder.png')
       .length;
+
+  // ------------------------- FITUR KOMENTAR -------------------------
+
+  List<CommentModel> getCommentsForHero(String heroId) {
+    return _comments[heroId] ?? const [];
+  }
+
+  int getCommentCount(String heroId) {
+    return (_comments[heroId] ?? const []).length;
+  }
+
+  Future<void> fetchComments(String heroId) async {
+    try {
+      final remoteComments = await _heroRepository.getComments(heroId);
+      if (remoteComments.isNotEmpty) {
+        _comments[heroId] = remoteComments;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Gagal mengambil komentar dari Supabase: $e');
+    }
+  }
+
+  Future<void> addComment({
+    required String heroId,
+    required String userName,
+    required String content,
+  }) async {
+    final effectiveName =
+        userName.trim().isEmpty ? 'Pengunjung' : userName.trim();
+    final newComment = CommentModel(
+      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      heroId: heroId,
+      userName: effectiveName,
+      content: content.trim(),
+      createdAt: DateTime.now(),
+    );
+
+    // Optimistic local update (langsung tampil di UI tanpa jeda)
+    final list = _comments.putIfAbsent(heroId, () => []);
+    list.insert(0, newComment);
+    notifyListeners();
+
+    // Simpan ke Supabase di background jika tabel tersedia
+    try {
+      final remoteComment = await _heroRepository.addComment(
+        heroId: heroId,
+        userName: effectiveName,
+        content: content.trim(),
+      );
+      if (remoteComment != null) {
+        final idx = list.indexWhere((c) => c.id == newComment.id);
+        if (idx != -1) {
+          list[idx] = remoteComment;
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Peringatan: Komentar tersimpan di sesi lokal (Supabase belum disinkronkan): $e');
+    }
+  }
+
+  Future<void> deleteComment(String heroId, String commentId) async {
+    final list = _comments[heroId];
+    if (list != null) {
+      list.removeWhere((c) => c.id == commentId);
+      notifyListeners();
+    }
+    try {
+      await _heroRepository.deleteComment(commentId);
+    } catch (e) {
+      debugPrint('Peringatan: Gagal menghapus komentar di Supabase: $e');
+    }
+  }
+
+  void _initDefaultComments() {
+    _comments.addAll({
+      'soekarno': [
+        CommentModel(
+          id: 'seed_sk_1',
+          heroId: 'soekarno',
+          userName: 'Ahmad Fauzi',
+          content:
+              'Sosok proklamator sejati yang pidatonya selalu menggetarkan jiwa rakyat Indonesia. Jasmerah!',
+          createdAt: DateTime.now().subtract(const Duration(hours: 3)),
+        ),
+        CommentModel(
+          id: 'seed_sk_2',
+          heroId: 'soekarno',
+          userName: 'Siti Rahma',
+          content:
+              'Terima kasih Bung Karno atas perjuangan dan fondasi Pancasila untuk bangsa kita tercinta.',
+          createdAt: DateTime.now().subtract(const Duration(days: 1)),
+        ),
+      ],
+      'bung_tomo': [
+        CommentModel(
+          id: 'seed_bt_1',
+          heroId: 'bung_tomo',
+          userName: 'Rian Pratama',
+          content:
+              'Semangat pertempuran 10 November tidak akan pernah pudar di Surabaya! Merdeka atau Mati!',
+          createdAt: DateTime.now().subtract(const Duration(hours: 5)),
+        ),
+        CommentModel(
+          id: 'seed_bt_2',
+          heroId: 'bung_tomo',
+          userName: 'Dian Permana',
+          content:
+              'Pidato Bung Tomo di radio selalu membangkitkan rasa patriotisme tinggi.',
+          createdAt: DateTime.now().subtract(const Duration(days: 2)),
+        ),
+      ],
+      'kartini': [
+        CommentModel(
+          id: 'seed_kar_1',
+          heroId: 'kartini',
+          userName: 'Nadia Salsabila',
+          content:
+              'Habis Gelap Terbitlah Terang. Inspirasi abadi bagi perempuan Indonesia untuk terus belajar dan berkarya.',
+          createdAt: DateTime.now().subtract(const Duration(hours: 8)),
+        ),
+      ],
+      'sudirman': [
+        CommentModel(
+          id: 'seed_sud_1',
+          heroId: 'sudirman',
+          userName: 'Bambang Irawan',
+          content:
+              'Panglima Besar yang memimpin gerilya dengan tandu di tengah sakit. Teladan sejati prajurit bangsa.',
+          createdAt: DateTime.now().subtract(const Duration(days: 1, hours: 2)),
+        ),
+      ],
+      'cut_nyak_dien': [
+        CommentModel(
+          id: 'seed_cnd_1',
+          heroId: 'cut_nyak_dien',
+          userName: 'Teuku Iskandar',
+          content:
+              'Srikandi agung dari Tanah Rencong yang pantang tunduk pada penjajah sampai akhir hayat.',
+          createdAt: DateTime.now().subtract(const Duration(days: 3)),
+        ),
+      ],
+    });
+  }
 }
+

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/comment_model.dart';
 import '../models/hero_model.dart';
 import '../services/supabase_service.dart';
 
@@ -112,4 +113,52 @@ class HeroRepository {
           .eq('hero_id', heroId);
     } catch (_) {}
   }
+
+  // ------------------------- KOMENTAR -------------------------
+
+  /// GET daftar komentar untuk pahlawan tertentu, diurutkan dari yang terbaru.
+  Future<List<CommentModel>> getComments(String heroId) async {
+    try {
+      final List<Map<String, dynamic>> rows = await _client
+          .from('hero_comments')
+          .select()
+          .eq('hero_id', heroId)
+          .order('created_at', ascending: false);
+
+      return rows.map(CommentModel.fromMap).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// POST komentar baru untuk pahlawan tertentu.
+  Future<CommentModel?> addComment({
+    required String heroId,
+    required String userName,
+    required String content,
+  }) async {
+    try {
+      final Map<String, dynamic> row = await _client
+          .from('hero_comments')
+          .insert({
+            'hero_id': heroId,
+            'user_name': userName.trim().isEmpty ? 'Pengunjung' : userName.trim(),
+            'content': content.trim(),
+          })
+          .select()
+          .single();
+
+      return CommentModel.fromMap(row);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// DELETE komentar berdasarkan id.
+  Future<void> deleteComment(String commentId) async {
+    try {
+      await _client.from('hero_comments').delete().eq('id', commentId);
+    } catch (_) {}
+  }
 }
+

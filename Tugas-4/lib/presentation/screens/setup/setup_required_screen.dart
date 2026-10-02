@@ -13,7 +13,7 @@ class SetupRequiredScreen extends StatelessWidget {
         child: EmptyState(
           icon: Icons.settings_suggest_rounded,
           title: 'Supabase belum dikonfigurasi',
-          message: 'Jalankan dengan --dart-define=SUPABASE_URL=... dan --dart-define=SUPABASE_ANON_KEY=... (lihat README).',
+          message: 'Isi supabaseUrl dan supabaseAnonKey di lib/core/config/secrets.dart, lalu jalankan ulang aplikasi.',
         ),
       ),
     );

@@ -1,11 +1,14 @@
-/// Konfigurasi dibaca dari --dart-define saat build/run.
-///
-/// flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
+import 'secrets.dart';
+
+/// Akses konfigurasi aplikasi. Nilai sebenarnya ada di secrets.dart.
 class Env {
   const Env._();
 
-  static const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  static const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  static const supabaseUrl = Secrets.supabaseUrl;
+  static const supabaseAnonKey = Secrets.supabaseAnonKey;
 
-  static bool get isConfigured => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+  static bool get isConfigured =>
+      supabaseUrl.startsWith('https://') &&
+      supabaseAnonKey.isNotEmpty &&
+      !supabaseAnonKey.startsWith('ISI_');
 }

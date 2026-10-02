@@ -3,12 +3,14 @@ import 'package:provider/provider.dart';
 
 import '../../../data/models/record_category.dart';
 import '../../../data/services/export_service.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../providers/records_provider.dart';
 import '../../navigation/app_routes.dart';
 import '../../widgets/category_style.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/record_card.dart';
 import '../../widgets/stat_card.dart';
+import '../../widgets/user_avatar.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -41,7 +43,8 @@ class HomeScreen extends StatelessWidget {
                 icon: const Icon(Icons.ios_share_rounded),
                 onPressed: provider.records.isEmpty ? null : () => _export(context),
               ),
-              const SizedBox(width: 4),
+              const _AccountButton(),
+              const SizedBox(width: 8),
             ],
           ),
           SliverToBoxAdapter(child: _Header(provider: provider)),
@@ -156,6 +159,20 @@ class _FilterChip extends StatelessWidget {
         onSelected: (_) => onTap(),
         showCheckmark: false,
       ),
+    );
+  }
+}
+
+class _AccountButton extends StatelessWidget {
+  const _AccountButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    return IconButton(
+      tooltip: 'Akun',
+      onPressed: () => AppRoutes.openAccount(context),
+      icon: UserAvatar(name: auth.displayName, imageUrl: auth.avatarUrl, radius: 16),
     );
   }
 }

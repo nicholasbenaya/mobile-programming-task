@@ -9,11 +9,14 @@ import '../models/record_draft.dart';
 import '../models/record_model.dart';
 
 /// Satu-satunya tempat yang bicara langsung dengan Supabase (database + storage).
+/// Bucket foto bersifat PRIVAT: foto ditampilkan lewat signed URL sementara,
+/// dan hanya pemilik akun yang bisa membuatnya (RLS storage).
 class RecordRepository {
   RecordRepository(this._client);
 
   final SupabaseClient _client;
   static const _uuid = Uuid();
+  static const _urlTtlSeconds = 6 * 60 * 60; // 6 jam
 
   static const _mimeByExt = {
     'jpg': 'image/jpeg',
@@ -22,8 +25,7 @@ class RecordRepository {
     'webp': 'image/webp',
   };
 
-  String _publicUrl(String path) =>
-      _client.storage.from(AppConstants.photoBucket).getPublicUrl(path);
+  StorageFileApi get _bucket => _client.storage.from(AppConstants.photoBucket);
 
   Future<List<RecordModel>> fetchAll() async {
     try {
@@ -31,9 +33,15 @@ class RecordRepository {
           .from(AppConstants.recordsTable)
           .select()
           .order('created_at', ascending: false);
-      return rows
-          .map<RecordModel>((m) => RecordModel.fromMap(m, photoUrl: _publicUrl(m['photo_path'] as String)))
-          .toList();
+      if (rows.isEmpty) return [];
+
+      final paths = [for (final m in rows) m['photo_path'] as String];
+      final signed = await _bucket.createSignedUrls(paths, _urlTtlSeconds);
+
+      return [
+        for (var i = 0; i < rows.length; i++)
+          RecordModel.fromMap(rows[i], photoUrl: i < signed.length ? signed[i].signedUrl : ''),
+      ];
     } catch (e) {
       throw _wrap(e, 'Gagal memuat data.');
     }
@@ -41,18 +49,15 @@ class RecordRepository {
 
   Future<RecordModel> create(RecordDraft draft, File photo) async {
     final userId = _client.auth.currentUser?.id;
-    if (userId == null) throw const AppException('Sesi belum siap. Mulai ulang aplikasi.');
+    if (userId == null) throw const AppException('Sesi berakhir. Silakan masuk lagi.');
 
     var ext = photo.path.split('.').last.toLowerCase();
     if (!_mimeByExt.containsKey(ext)) ext = 'jpg';
+    // Folder pertama = id pemilik, dicek oleh policy storage.
     final path = '$userId/${_uuid.v4()}.$ext';
 
     try {
-      await _client.storage.from(AppConstants.photoBucket).upload(
-            path,
-            photo,
-            fileOptions: FileOptions(contentType: _mimeByExt[ext]),
-          );
+      await _bucket.upload(path, photo, fileOptions: FileOptions(contentType: _mimeByExt[ext]));
     } catch (e) {
       throw _wrap(e, 'Gagal mengunggah foto.');
     }
@@ -63,10 +68,11 @@ class RecordRepository {
           .insert(draft.toInsertMap(path))
           .select()
           .single();
-      return RecordModel.fromMap(row, photoUrl: _publicUrl(path));
+      final url = await _bucket.createSignedUrl(path, _urlTtlSeconds);
+      return RecordModel.fromMap(row, photoUrl: url);
     } catch (e) {
       // Hindari file foto yatim jika insert gagal.
-      await _client.storage.from(AppConstants.photoBucket).remove([path]).catchError((_) => <FileObject>[]);
+      await _bucket.remove([path]).catchError((_) => <FileObject>[]);
       throw _wrap(e, 'Gagal menyimpan catatan.');
     }
   }
@@ -74,7 +80,7 @@ class RecordRepository {
   Future<void> delete(RecordModel record) async {
     try {
       await _client.from(AppConstants.recordsTable).delete().eq('id', record.id);
-      await _client.storage.from(AppConstants.photoBucket).remove([record.photoPath]);
+      await _bucket.remove([record.photoPath]);
     } catch (e) {
       throw _wrap(e, 'Gagal menghapus catatan.');
     }

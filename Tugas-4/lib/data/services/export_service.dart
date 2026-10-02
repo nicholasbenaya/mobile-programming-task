@@ -8,7 +8,7 @@ import '../models/record_model.dart';
 class ExportService {
   static const _headers = [
     'id', 'created_at', 'title', 'category', 'note', 'latitude', 'longitude',
-    'accuracy', 'compass', 'tilt', 'battery', 'photo_path', 'photo_url',
+    'accuracy', 'compass', 'tilt', 'battery', 'photo_path',
   ];
 
   String buildCsv(List<RecordModel> records) {
@@ -17,7 +17,7 @@ class ExportService {
       for (final r in records)
         [
           r.id, r.createdAt.toUtc().toIso8601String(), r.title, r.category.name, r.note,
-          r.latitude, r.longitude, r.accuracy, r.compass, r.tilt, r.battery, r.photoPath, r.photoUrl,
+          r.latitude, r.longitude, r.accuracy, r.compass, r.tilt, r.battery, r.photoPath,
         ],
     ];
     // BOM supaya Excel membaca UTF-8 dengan benar.

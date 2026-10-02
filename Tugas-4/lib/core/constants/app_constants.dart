@@ -9,6 +9,10 @@ class AppConstants {
   static const maxNoteLength = 1000;
   static const photoBucket = 'record-photos';
   static const recordsTable = 'records';
+
+  /// Deep link untuk kembali ke aplikasi setelah login Google / verifikasi email (HP).
+  /// Harus didaftarkan di Supabase > Authentication > URL Configuration > Redirect URLs.
+  static const authRedirectUrl = 'io.supabase.sensorlog://login-callback/';
   static const mapUserAgent = 'id.sensorlog.app';
   static const mapTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   static const defaultMapCenter = LatLng(-2.5, 118.0); // tengah Indonesia

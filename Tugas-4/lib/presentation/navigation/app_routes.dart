@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/models/record_model.dart';
 import '../../providers/records_provider.dart';
+import '../screens/account/account_screen.dart';
 import '../screens/capture/capture_screen.dart';
 import '../screens/detail/record_detail_screen.dart';
 
@@ -13,6 +14,12 @@ class AppRoutes {
   static Future<void> openDetail(BuildContext context, RecordModel record) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => RecordDetailScreen(record: record)),
+    );
+  }
+
+  static Future<void> openAccount(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const AccountScreen()),
     );
   }
 

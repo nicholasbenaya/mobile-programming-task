@@ -1,4 +1,4 @@
-# SensorLog — Tugas Sensor
+# SensorLog - Tugas Sensor
 
 Aplikasi lokal untuk dokumentasi lapangan sesuai spesifikasi tugas:
 - Mengambil koordinat GPS dari browser.

@@ -9,7 +9,6 @@ import '../../widgets/category_style.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/record_card.dart';
 import '../../widgets/stat_card.dart';
-import '../../widgets/sensor_orbit.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -20,8 +19,7 @@ class HomeScreen extends StatelessWidget {
     try {
       await context.read<ExportService>().shareCsv(records);
     } catch (_) {
-      messenger
-          .showSnackBar(const SnackBar(content: Text('Gagal mengekspor data')));
+      messenger.showSnackBar(const SnackBar(content: Text('Gagal mengekspor data')));
     }
   }
 
@@ -36,29 +34,19 @@ class HomeScreen extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverAppBar.large(
-            title: const Text('SensorLog',
-                style: TextStyle(fontWeight: FontWeight.w800)),
+            title: const Text('SensorLog', style: TextStyle(fontWeight: FontWeight.w800)),
             actions: [
               IconButton(
                 tooltip: 'Ekspor CSV',
                 icon: const Icon(Icons.ios_share_rounded),
-                onPressed:
-                    provider.records.isEmpty ? null : () => _export(context),
+                onPressed: provider.records.isEmpty ? null : () => _export(context),
               ),
               const SizedBox(width: 4),
             ],
           ),
           SliverToBoxAdapter(child: _Header(provider: provider)),
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: SensorOrbit(),
-            ),
-          ),
           if (provider.loading && provider.records.isEmpty)
-            const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()))
+            const SliverFillRemaining(hasScrollBody: false, child: Center(child: CircularProgressIndicator()))
           else if (provider.error != null && provider.records.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
@@ -74,12 +62,8 @@ class HomeScreen extends StatelessWidget {
             SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyState(
-                icon: provider.records.isEmpty
-                    ? Icons.add_a_photo_rounded
-                    : Icons.search_off_rounded,
-                title: provider.records.isEmpty
-                    ? 'Belum ada catatan'
-                    : 'Tidak ditemukan',
+                icon: provider.records.isEmpty ? Icons.add_a_photo_rounded : Icons.search_off_rounded,
+                title: provider.records.isEmpty ? 'Belum ada catatan' : 'Tidak ditemukan',
                 message: provider.records.isEmpty
                     ? 'Ketuk tombol kamera di bawah untuk membuat catatan lapangan pertama.'
                     : 'Coba ubah kata kunci atau filter kategori.',
@@ -116,23 +100,11 @@ class _Header extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(
-                  child: StatCard(
-                      label: 'Total catatan',
-                      value: '${provider.records.length}',
-                      icon: Icons.folder_rounded)),
+              Expanded(child: StatCard(label: 'Total catatan', value: '${provider.records.length}', icon: Icons.folder_rounded)),
               const SizedBox(width: 10),
-              Expanded(
-                  child: StatCard(
-                      label: 'Hari ini',
-                      value: '${provider.todayCount}',
-                      icon: Icons.today_rounded)),
+              Expanded(child: StatCard(label: 'Hari ini', value: '${provider.todayCount}', icon: Icons.today_rounded)),
               const SizedBox(width: 10),
-              Expanded(
-                  child: StatCard(
-                      label: '7 hari',
-                      value: '${provider.weekCount}',
-                      icon: Icons.date_range_rounded)),
+              Expanded(child: StatCard(label: '7 hari', value: '${provider.weekCount}', icon: Icons.date_range_rounded)),
             ],
           ),
           const SizedBox(height: 16),
@@ -149,17 +121,13 @@ class _Header extends StatelessWidget {
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
-                _FilterChip(
-                    label: 'Semua',
-                    selected: provider.filter == null,
-                    onTap: () => provider.setFilter(null)),
+                _FilterChip(label: 'Semua', selected: provider.filter == null, onTap: () => provider.setFilter(null)),
                 for (final c in RecordCategory.values)
                   _FilterChip(
                     label: c.label,
                     icon: c.icon,
                     selected: provider.filter == c,
-                    onTap: () =>
-                        provider.setFilter(provider.filter == c ? null : c),
+                    onTap: () => provider.setFilter(provider.filter == c ? null : c),
                   ),
               ],
             ),
@@ -171,11 +139,7 @@ class _Header extends StatelessWidget {
 }
 
 class _FilterChip extends StatelessWidget {
-  const _FilterChip(
-      {required this.label,
-      required this.selected,
-      required this.onTap,
-      this.icon});
+  const _FilterChip({required this.label, required this.selected, required this.onTap, this.icon});
   final String label;
   final IconData? icon;
   final bool selected;

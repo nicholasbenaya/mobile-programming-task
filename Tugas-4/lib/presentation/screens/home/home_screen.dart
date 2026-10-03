@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -8,6 +10,8 @@ import '../../../providers/records_provider.dart';
 import '../../navigation/app_routes.dart';
 import '../../widgets/category_style.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/motion/fade_in_slide.dart';
+import '../../widgets/motion/shimmer_skeleton.dart';
 import '../../widgets/record_card.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/user_avatar.dart';
@@ -49,7 +53,7 @@ class HomeScreen extends StatelessWidget {
           ),
           SliverToBoxAdapter(child: _Header(provider: provider)),
           if (provider.loading && provider.records.isEmpty)
-            const SliverFillRemaining(hasScrollBody: false, child: Center(child: CircularProgressIndicator()))
+            const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(16, 8, 16, 0), child: SkeletonList()))
           else if (provider.error != null && provider.records.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
@@ -78,9 +82,13 @@ class HomeScreen extends StatelessWidget {
               sliver: SliverList.separated(
                 itemCount: items.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, i) => RecordCard(
-                  record: items[i],
-                  onTap: () => AppRoutes.openDetail(context, items[i]),
+                itemBuilder: (context, i) => FadeInSlide(
+                  key: ValueKey(items[i].id),
+                  delay: Duration(milliseconds: math.min(i, 8) * 55),
+                  child: RecordCard(
+                    record: items[i],
+                    onTap: () => AppRoutes.openDetail(context, items[i]),
+                  ),
                 ),
               ),
             ),
@@ -103,11 +111,11 @@ class _Header extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: StatCard(label: 'Total catatan', value: '${provider.records.length}', icon: Icons.folder_rounded)),
+              Expanded(child: StatCard(label: 'Total catatan', value: provider.records.length, icon: Icons.folder_rounded)),
               const SizedBox(width: 10),
-              Expanded(child: StatCard(label: 'Hari ini', value: '${provider.todayCount}', icon: Icons.today_rounded)),
+              Expanded(child: StatCard(label: 'Hari ini', value: provider.todayCount, icon: Icons.today_rounded)),
               const SizedBox(width: 10),
-              Expanded(child: StatCard(label: '7 hari', value: '${provider.weekCount}', icon: Icons.date_range_rounded)),
+              Expanded(child: StatCard(label: '7 hari', value: provider.weekCount, icon: Icons.date_range_rounded)),
             ],
           ),
           const SizedBox(height: 16),

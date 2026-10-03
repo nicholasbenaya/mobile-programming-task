@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'motion/fade_in_slide.dart';
+import 'motion/press_scale.dart';
+
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,
@@ -25,24 +28,33 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(color: scheme.primaryContainer, shape: BoxShape.circle),
-              child: Icon(icon, size: 40, color: scheme.onPrimaryContainer),
+            PopIn(
+              child: Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(color: scheme.primaryContainer, shape: BoxShape.circle),
+                child: Icon(icon, size: 40, color: scheme.onPrimaryContainer),
+              ),
             ),
             const SizedBox(height: 20),
-            Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+            FadeInSlide(
+              delay: const Duration(milliseconds: 150),
+              child: Column(
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                  if (actionLabel != null) ...[
+                    const SizedBox(height: 20),
+                    PressScale(child: FilledButton.tonal(onPressed: onAction, child: Text(actionLabel!))),
+                  ],
+                ],
+              ),
             ),
-            if (actionLabel != null) ...[
-              const SizedBox(height: 20),
-              FilledButton.tonal(onPressed: onAction, child: Text(actionLabel!)),
-            ],
           ],
         ),
       ),

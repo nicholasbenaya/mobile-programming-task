@@ -14,6 +14,7 @@ Aplikasi catatan lapangan berbasis **Flutter** dan **Supabase**. Setiap akun men
 - Peta semua catatan (OpenStreetMap, tanpa API key)
 - Halaman detail dan halaman akun (profil, keluar)
 - Ekspor catatan ke CSV, mode terang dan gelap
+- Animasi dan transisi: perpindahan layar, efek tekan tombol, skeleton loading, daftar muncul berurutan, animasi sukses saat simpan (menghormati pengaturan "kurangi animasi" perangkat)
 
 ## Kesesuaian dengan spesifikasi tugas
 
@@ -56,11 +57,30 @@ lib/
     │   ├── auth/                 # login + daftar (+ widgets/)
     │   ├── account/              # profil dan keluar
     │   ├── home/  capture/  map/  detail/  setup/
-    └── widgets/                  # komponen yang dipakai ulang
+    └── widgets/                  # komponen yang dipakai ulang (motion/ = animasi)
 supabase/schema.sql               # tabel, RLS, dan bucket storage
 ```
 
 Alurnya satu arah: `presentation` → `providers` → `data`. Layar tidak pernah memanggil Supabase langsung.
+
+## Animasi dan transisi
+
+| Elemen | Efek |
+|---|---|
+| Pindah layar (`navigation/app_transitions.dart`) | Fade + geser; layar Catat naik dari bawah |
+| Tab Beranda/Peta | Fade + geser sesuai arah, indikator tab berbentuk pil yang beranimasi |
+| Semua tombol utama (`widgets/motion/press_scale.dart`) | Mengecil saat ditekan + getar halus |
+| Tombol Masuk/Simpan (`loading_button.dart`) | Label berganti jadi indikator loading dengan transisi |
+| Memuat daftar (`shimmer_skeleton.dart`) | Kerangka kartu berkilau, bukan spinner kosong |
+| Daftar catatan, detail, akun | Muncul berurutan (fade + geser) |
+| Foto (`widgets/network_photo.dart`) | Fade-in saat termuat; Hero dari daftar ke detail |
+| Kartu statistik | Angka menghitung naik |
+| Layar Catat | Foto, status GPS, dan jarum kompas berganti dengan halus; centang "Tersimpan!" setelah berhasil |
+| Login | Logo dan banner pesan beranimasi; ikon mata password berganti halus |
+| Peta | Pin muncul membal satu per satu |
+| Hapus catatan | Pemuat modal selama proses berjalan |
+
+Animasi berada di `lib/presentation/widgets/motion/`. Jika pengguna mengaktifkan "kurangi animasi" di perangkat, efek masuk dilewati.
 
 ## Cara kerja akun dan privasi
 

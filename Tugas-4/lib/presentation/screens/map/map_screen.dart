@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -12,6 +14,8 @@ import '../../navigation/app_routes.dart';
 import '../../widgets/category_chip.dart';
 import '../../widgets/category_style.dart';
 import '../../widgets/map_tile_layer.dart';
+import '../../widgets/motion/fade_in_slide.dart';
+import '../../widgets/network_photo.dart';
 
 /// Semua catatan ditampilkan sebagai pin berwarna di peta OpenStreetMap.
 class MapScreen extends StatefulWidget {
@@ -52,8 +56,7 @@ class _MapScreenState extends State<MapScreen> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: Image.network(record.photoUrl, width: 90, height: 90, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox(width: 90, height: 90, child: Icon(Icons.broken_image_rounded))),
+              child: NetworkPhoto(url: record.photoUrl, width: 90, height: 90),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -104,12 +107,14 @@ class _MapScreenState extends State<MapScreen> {
             buildTileLayer(),
             MarkerLayer(
               markers: [
-                for (final r in records)
+                for (final (i, r) in records.indexed)
                   Marker(
                     point: LatLng(r.latitude, r.longitude),
                     width: 44,
                     height: 44,
-                    child: GestureDetector(
+                    child: PopIn(
+                      delay: Duration(milliseconds: math.min(i, 10) * 50),
+                      child: GestureDetector(
                       onTap: () => _preview(r),
                       child: Container(
                         decoration: BoxDecoration(
@@ -120,6 +125,7 @@ class _MapScreenState extends State<MapScreen> {
                         ),
                         child: Icon(r.category.icon, size: 20, color: Colors.white),
                       ),
+                    ),
                     ),
                   ),
               ],
@@ -132,7 +138,9 @@ class _MapScreenState extends State<MapScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Material(
+                FadeInSlide(
+                  offset: const Offset(0, -12),
+                  child: Material(
                   elevation: 3,
                   borderRadius: BorderRadius.circular(16),
                   color: scheme.surface,
@@ -152,6 +160,7 @@ class _MapScreenState extends State<MapScreen> {
                       ],
                     ),
                   ),
+                ),
                 ),
                 const SizedBox(height: 8),
                 SizedBox(

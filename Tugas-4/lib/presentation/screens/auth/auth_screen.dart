@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../../core/utils/validators.dart';
 import '../../../providers/auth_provider.dart';
+import '../../widgets/motion/fade_in_slide.dart';
+import '../../widgets/motion/loading_button.dart';
 import 'widgets/auth_banner.dart';
 import 'widgets/auth_header.dart';
 import 'widgets/google_button.dart';
@@ -24,6 +26,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   bool _isLogin = true;
   bool _obscure = true;
+  bool _googleLoading = false;
   String? _info;
 
   @override
@@ -67,6 +70,13 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _google() async {
+    FocusScope.of(context).unfocus();
+    setState(() => _googleLoading = true);
+    await context.read<AuthProvider>().signInWithGoogle();
+    if (mounted) setState(() => _googleLoading = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -102,14 +112,31 @@ class _AuthScreenState extends State<AuthScreen> {
                         onSelectionChanged: auth.loading ? null : (s) => _setMode(s.first),
                       ),
                       const SizedBox(height: 20),
-                      if (_info != null) ...[
-                        AuthBanner(icon: Icons.mark_email_read_rounded, message: _info!, color: scheme.primary),
-                        const SizedBox(height: 14),
-                      ],
-                      if (auth.error != null) ...[
-                        AuthBanner(icon: Icons.error_outline_rounded, message: auth.error!, color: scheme.error),
-                        const SizedBox(height: 14),
-                      ],
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: Column(
+                          children: [
+                            if (_info != null) ...[
+                              FadeInSlide(
+                                key: ValueKey(_info),
+                                offset: const Offset(0, -8),
+                                child: AuthBanner(icon: Icons.mark_email_read_rounded, message: _info!, color: scheme.primary),
+                              ),
+                              const SizedBox(height: 14),
+                            ],
+                            if (auth.error != null) ...[
+                              FadeInSlide(
+                                key: ValueKey(auth.error),
+                                offset: const Offset(0, -8),
+                                child: AuthBanner(icon: Icons.error_outline_rounded, message: auth.error!, color: scheme.error),
+                              ),
+                              const SizedBox(height: 14),
+                            ],
+                          ],
+                        ),
+                      ),
                       AnimatedSize(
                         duration: const Duration(milliseconds: 200),
                         alignment: Alignment.topCenter,
@@ -152,7 +179,14 @@ class _AuthScreenState extends State<AuthScreen> {
                           suffixIcon: IconButton(
                             tooltip: _obscure ? 'Tampilkan password' : 'Sembunyikan password',
                             onPressed: () => setState(() => _obscure = !_obscure),
-                            icon: Icon(_obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded),
+                            icon: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              transitionBuilder: (c, a) => ScaleTransition(scale: a, child: FadeTransition(opacity: a, child: c)),
+                              child: Icon(
+                                _obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                                key: ValueKey(_obscure),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -178,11 +212,10 @@ class _AuthScreenState extends State<AuthScreen> {
                               ),
                       ),
                       const SizedBox(height: 22),
-                      FilledButton(
+                      LoadingButton(
+                        loading: auth.loading && !_googleLoading,
                         onPressed: auth.loading ? null : _submit,
-                        child: auth.loading
-                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
-                            : Text(_isLogin ? 'Masuk' : 'Buat akun'),
+                        label: _isLogin ? 'Masuk' : 'Buat akun',
                       ),
                       const SizedBox(height: 18),
                       Row(
@@ -197,8 +230,9 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                       const SizedBox(height: 18),
                       GoogleButton(
-                        enabled: !auth.loading,
-                        onPressed: () => context.read<AuthProvider>().signInWithGoogle(),
+                        enabled: !auth.loading || _googleLoading,
+                        loading: _googleLoading,
+                        onPressed: _google,
                       ),
                       const SizedBox(height: 24),
                       Row(

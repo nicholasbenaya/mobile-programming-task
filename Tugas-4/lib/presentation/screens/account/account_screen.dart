@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/utils/formatters.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/records_provider.dart';
+import '../../widgets/motion/fade_in_slide.dart';
+import '../../widgets/motion/press_scale.dart';
 import '../../widgets/user_avatar.dart';
 
 class AccountScreen extends StatelessWidget {
@@ -31,6 +34,7 @@ class AccountScreen extends StatelessWidget {
     if (ok != true) return;
 
     // Tutup semua layar yang terbuka dulu, baru keluar; AuthGate akan menampilkan layar login.
+    HapticFeedback.mediumImpact();
     navigator.popUntil((route) => route.isFirst);
     await auth.signOut();
   }
@@ -47,13 +51,13 @@ class AccountScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Akun', style: TextStyle(fontWeight: FontWeight.w800))),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        children: [
+        children: staggered([
           Card(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
               child: Column(
                 children: [
-                  UserAvatar(name: auth.displayName, imageUrl: auth.avatarUrl, radius: 44),
+                  PopIn(delay: const Duration(milliseconds: 150), child: UserAvatar(name: auth.displayName, imageUrl: auth.avatarUrl, radius: 44)),
                   const SizedBox(height: 14),
                   Text(auth.displayName, style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 2),
@@ -106,16 +110,18 @@ class AccountScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          FilledButton.tonalIcon(
-            style: FilledButton.styleFrom(
-              foregroundColor: scheme.error,
-              minimumSize: const Size.fromHeight(54),
+          PressScale(
+            child: FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(
+                foregroundColor: scheme.error,
+                minimumSize: const Size.fromHeight(54),
+              ),
+              onPressed: () => _logout(context),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Keluar'),
             ),
-            onPressed: () => _logout(context),
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Keluar'),
           ),
-        ],
+        ]),
       ),
     );
   }

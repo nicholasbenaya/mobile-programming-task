@@ -7,6 +7,14 @@ import 'data/services/supabase_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id_ID');
-  await SupabaseService.initialize();
-  runApp(const SensorLogApp());
+
+  // Jangan biarkan error startup (key salah, anonymous sign-in mati, tanpa
+  // internet) membuat layar putih: tampilkan pesannya di layar.
+  String? startupError;
+  try {
+    await SupabaseService.initialize();
+  } catch (e) {
+    startupError = e.toString();
+  }
+  runApp(SensorLogApp(startupError: startupError));
 }

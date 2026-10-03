@@ -60,13 +60,13 @@ class CaptureProvider extends ChangeNotifier {
         _compass = v;
         _notify();
       }
-    });
+    }, onError: (_) {}); // sensor tidak tersedia (mis. di web) -> abaikan
     _tiltSub = sensorService.tiltStream().listen((v) {
       if (_tilt == null || (v - _tilt!).abs() >= 2) {
         _tilt = v;
         _notify();
       }
-    });
+    }, onError: (_) {});
     _battery = await sensorService.batteryLevel();
     _notify();
     await refreshLocation();

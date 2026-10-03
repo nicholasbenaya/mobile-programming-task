@@ -15,6 +15,24 @@ class SensorSection extends StatelessWidget {
     final p = context.watch<CaptureProvider>();
     final scheme = Theme.of(context).colorScheme;
     final pos = p.position;
+    final hasError = p.locationError != null;
+
+    // Satu kunci per keadaan agar AnimatedSwitcher melakukan cross-fade saat berganti.
+    final Widget status;
+    if (hasError) {
+      status = Text(p.locationError!, key: const ValueKey('error'), style: TextStyle(color: scheme.onErrorContainer));
+    } else if (pos == null) {
+      status = const Text('Mencari lokasi…', key: ValueKey('searching'));
+    } else {
+      status = Column(
+        key: ValueKey('${pos.latitude},${pos.longitude}'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(Formatters.coordinates(pos.latitude, pos.longitude), style: const TextStyle(fontWeight: FontWeight.w800)),
+          Text('Akurasi ${Formatters.meters(pos.accuracy)}', style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+        ],
+      );
+    }
 
     return SectionCard(
       step: 2,
@@ -22,44 +40,50 @@ class SensorSection extends StatelessWidget {
       trailing: IconButton(
         tooltip: 'Segarkan lokasi',
         onPressed: p.locating ? null : p.refreshLocation,
-        icon: p.locating
-            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5))
-            : const Icon(Icons.my_location_rounded),
+        icon: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: p.locating
+              ? const SizedBox(key: ValueKey('spin'), width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5))
+              : const Icon(Icons.my_location_rounded, key: ValueKey('icon')),
+        ),
       ),
       child: Column(
         children: [
-          Container(
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: (p.locationError != null ? scheme.errorContainer : scheme.primaryContainer).withValues(alpha: 0.6),
+              color: (hasError ? scheme.errorContainer : scheme.primaryContainer).withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               children: [
-                Icon(
-                  p.locationError != null ? Icons.location_off_rounded : Icons.place_rounded,
-                  color: p.locationError != null ? scheme.error : scheme.primary,
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  transitionBuilder: (c, a) => ScaleTransition(scale: a, child: FadeTransition(opacity: a, child: c)),
+                  child: Icon(
+                    hasError ? Icons.location_off_rounded : Icons.place_rounded,
+                    key: ValueKey(hasError),
+                    color: hasError ? scheme.error : scheme.primary,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: p.locationError != null
-                      ? Text(p.locationError!, style: TextStyle(color: scheme.onErrorContainer))
-                      : pos == null
-                          ? const Text('Mencari lokasi…')
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  Formatters.coordinates(pos.latitude, pos.longitude),
-                                  style: const TextStyle(fontWeight: FontWeight.w800),
-                                ),
-                                Text(
-                                  'Akurasi ${Formatters.meters(pos.accuracy)}',
-                                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                                ),
-                              ],
-                            ),
+                  child: AnimatedSize(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topLeft,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      layoutBuilder: (current, previous) => Stack(
+                        alignment: Alignment.centerLeft,
+                        children: [...previous, if (current != null) current],
+                      ),
+                      child: status,
+                    ),
+                  ),
                 ),
               ],
             ),

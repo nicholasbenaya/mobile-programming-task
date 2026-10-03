@@ -9,6 +9,8 @@ import '../../../data/models/record_model.dart';
 import '../../../providers/records_provider.dart';
 import '../../widgets/category_chip.dart';
 import '../../widgets/map_tile_layer.dart';
+import '../../widgets/motion/fade_in_slide.dart';
+import '../../widgets/network_photo.dart';
 import '../../widgets/sensor_tile.dart';
 
 class RecordDetailScreen extends StatelessWidget {
@@ -37,10 +39,20 @@ class RecordDetailScreen extends StatelessWidget {
     );
     if (ok != true) return;
 
+    if (!context.mounted) return;
+    // Pemuat modal selama proses hapus berjalan.
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(canPop: false, child: Center(child: CircularProgressIndicator())),
+    );
     try {
       await provider.delete(record);
-      navigator.pop();
+      HapticFeedback.mediumImpact();
+      navigator.pop(); // tutup pemuat
+      navigator.pop(); // tutup halaman detail
     } catch (e) {
+      navigator.pop(); // tutup pemuat
       messenger.showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
@@ -88,18 +100,14 @@ class RecordDetailScreen extends StatelessWidget {
             flexibleSpace: FlexibleSpaceBar(
               background: GestureDetector(
                 onTap: () => _showFullPhoto(context),
-                child: Image.network(
-                  record.photoUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(color: scheme.surfaceContainerHighest, child: const Icon(Icons.broken_image_rounded, size: 48)),
-                ),
+                child: NetworkPhoto(url: record.photoUrl, heroTag: 'photo-${record.id}'),
               ),
             ),
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
             sliver: SliverList.list(
-              children: [
+              children: staggered([
                 Text(record.title, style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 10),
                 Row(
@@ -185,7 +193,7 @@ class RecordDetailScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   Card(child: Padding(padding: const EdgeInsets.all(16), child: SizedBox(width: double.infinity, child: Text(record.note, style: text.bodyLarge)))),
                 ],
-              ],
+              ]),
             ),
           ),
         ],

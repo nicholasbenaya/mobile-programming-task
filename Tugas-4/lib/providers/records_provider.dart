@@ -10,12 +10,26 @@ class RecordsProvider extends ChangeNotifier {
   RecordsProvider(this._repository);
 
   final RecordRepository _repository;
+  String? _userId;
 
   List<RecordModel> _records = [];
   bool _loading = false;
   String? _error;
   RecordCategory? _filter;
   String _query = '';
+
+  /// Dipanggil saat akun berganti: kosongkan data lama, muat data akun baru.
+  void onUserChanged(String? userId) {
+    if (userId == _userId) return;
+    _userId = userId;
+    _records = [];
+    _error = null;
+    _filter = null;
+    _query = '';
+    _loading = false;
+    // Ditunda agar tidak memanggil notifyListeners saat widget tree sedang build.
+    Future.microtask(userId != null ? load : notifyListeners);
+  }
 
   List<RecordModel> get records => _records;
   bool get loading => _loading;
@@ -45,15 +59,17 @@ class RecordsProvider extends ChangeNotifier {
   }
 
   Future<void> load() async {
+    final uid = _userId;
     _loading = true;
     _error = null;
     notifyListeners();
     try {
-      _records = await _repository.fetchAll();
+      final data = await _repository.fetchAll();
+      if (uid == _userId) _records = data; // abaikan hasil akun lama
     } on AppException catch (e) {
-      _error = e.message;
+      if (uid == _userId) _error = e.message;
     } finally {
-      _loading = false;
+      if (uid == _userId) _loading = false;
       notifyListeners();
     }
   }

@@ -211,6 +211,7 @@ Kebutuhan: Flutter 3.27 atau lebih baru.
 |---|---|
 | `Target of URI doesn't exist: 'package:provider/provider.dart'` | Jalankan `flutter pub get`, lalu restart Dart analysis server |
 | `intl ^0.20.3 is required` | Di `pubspec.yaml` ubah menjadi `intl: ^0.20.3` |
+| Layar kosong/putih saja (terutama di APK) | Izin `INTERNET` belum ada di `AndroidManifest.xml` utama, atau error tampilan. Versi terbaru menampilkan pesan error di layar; kirim teksnya. Untuk log lengkap: `flutter run --release` dengan HP tersambung kabel |
 | Layar "Supabase belum dikonfigurasi" | `secrets.dart` masih berisi placeholder |
 | 404 `Invalid path specified in request URL` | `supabaseUrl` salah; gunakan `https://<ref>.supabase.co` |
 | "Email atau password salah" | Kredensial salah, atau akun dibuat via Google (masuk dengan tombol Google) |

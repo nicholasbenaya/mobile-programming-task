@@ -6,7 +6,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../domain/ronda/models/ronda_models.dart';
 import '../../../domain/ronda/services/haversine_calculator.dart';
 import '../../../providers/ronda_provider.dart';
+import 'widgets/dynamic_roster_calendar_dialog.dart';
 import 'widgets/patrol_calendar_widget.dart';
+import 'widgets/patrol_interactive_map.dart';
 import 'widgets/sos_qr_scanner_dialog.dart';
 
 /// Dasbor Utama Khusus Petugas Ronda: Fokus pada Tugas Patroli, Scan Pos Fisik & Respons Darurat SOS
@@ -97,19 +99,31 @@ class PetugasRondaDashboard extends StatelessWidget {
             const SizedBox(height: 16),
           ],
 
-          // 5. Status Tugas & Kesiagaan Piket
+          // 5. Peta Interaktif Patroli Wilayah
+          _buildPatrolMapCard(context, ronda),
+          const SizedBox(height: 16),
+
+          // 6. Status Tugas & Kesiagaan Piket
           _buildDutyStatusCard(context, ronda),
           const SizedBox(height: 16),
 
-          // 6. Daftar Pos Checkpoint Fisik (Patroli QR + Haversine GPS + Jadwal Pos)
+          // 7. Daftar Pos Checkpoint Fisik (Patroli QR + Haversine GPS + Jadwal Pos)
           _buildCheckpointsSection(context, ronda),
           const SizedBox(height: 16),
 
-          // 7. Aksi Lapangan Cepat
+          // 8. Permintaan Tukar Jadwal On-going
+          _buildOngoingSwapRequestsSection(context, ronda),
+          const SizedBox(height: 16),
+
+          // 9. Aksi Lapangan Cepat
           _buildQuickActionSection(context, ronda),
+          const SizedBox(height: 16),
+
+          // 10. Riwayat Audit Penanganan SOS Saya
+          _buildResolvedSosAuditSection(context, ronda),
           const SizedBox(height: 20),
 
-          // 8. Kalender & Roster Jadwal Ronda
+          // 11. Kalender & Roster Jadwal Ronda
           PatrolCalendarWidget(ronda: ronda, allowAdminManagement: false),
         ],
       ),
@@ -903,160 +917,322 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  /// Dialog Pengajuan Tukar Jadwal Lengkap (Pilih Rekan, Tanggal, Shift, dan Alasan)
-  void _showRichShiftSwapDialog(BuildContext context, RondaProvider ronda) {
-    final mySchedules = ronda.schedules.where((s) => s.userId == ronda.currentUser!.id && !s.isLibur).toList();
-    final otherOfficers = ronda.allOfficers.where((u) => u.id != ronda.currentUser!.id).toList();
-
-    if (otherOfficers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tidak ada petugas pengganti lain yang terdaftar.')),
-      );
-      return;
-    }
-
-    String selectedScheduleId = mySchedules.isNotEmpty ? mySchedules.first.id : 'SCHED-CUSTOM';
-    String targetOfficerId = otherOfficers.first.id;
-    DateTime targetDate = DateTime.now().add(const Duration(days: 1));
-    String targetShift = 'Shift Malam (22:00 - 04:00)';
-    final noteController = TextEditingController(text: 'Ada keperluan keluarga mendesak.');
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: const Row(
+  Widget _buildPatrolMapCard(BuildContext context, RondaProvider ronda) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Row(
               children: [
-                Icon(Icons.swap_horiz, color: AppColors.secondary),
-                SizedBox(width: 8),
-                Text('Ajukan Tukar Jadwal', style: TextStyle(fontSize: 16)),
+                const Icon(Icons.map, color: AppColors.secondary, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Peta Interaktif Wilayah Patroli RT',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+                Text(
+                  'Ketuk pin pos untuk scan',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
               ],
             ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Jadwal yang ingin ditukar
-                  const Text('Jadwal Saya yang Ingin Ditukar:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 6),
-                  if (mySchedules.isNotEmpty)
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedScheduleId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(isDense: true),
-                      items: mySchedules.map((s) {
-                        return DropdownMenuItem(
-                          value: s.id,
+          ),
+          const SizedBox(
+            height: 220,
+            child: PatrolInteractiveMap(height: 220),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOngoingSwapRequestsSection(BuildContext context, RondaProvider ronda) {
+    final incoming = ronda.myIncomingSwapRequests;
+    final outgoing = ronda.myOutgoingSwapRequests;
+
+    if (incoming.isEmpty && outgoing.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.sync_alt, color: AppColors.patrolAccent, size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              'Permintaan Tukar Jadwal (On-Going Requests)',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const Spacer(),
+            if (incoming.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.emergency,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${incoming.length} Baru',
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Permintaan Masuk (Incoming Requests)
+        if (incoming.isNotEmpty) ...[
+          const Text(
+            'Permintaan Masuk dari Rekan (Perlu Persetujuan Anda):',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.patrolAccent),
+          ),
+          const SizedBox(height: 6),
+          ...incoming.map((req) {
+            return Card(
+              color: AppColors.patrolAccentLight.withValues(alpha: 0.3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppColors.patrolAccent.withValues(alpha: 0.6)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.person, size: 16, color: AppColors.primaryLight),
+                        const SizedBox(width: 6),
+                        Expanded(
                           child: Text(
-                            '${DateFormat('dd MMM yyyy').format(s.tanggalRonda)} - ${s.shiftName}',
-                            style: const TextStyle(fontSize: 12),
+                            'Dari: ${req.requesterName}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                           ),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setDialogState(() => selectedScheduleId = val);
-                      },
-                    )
-                  else
-                    const Text('Belum ada jadwal dinas mendatang.', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  const SizedBox(height: 12),
-
-                  // Rekan Petugas Pengganti
-                  const Text('Tukar dengan Rekan Petugas:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    initialValue: targetOfficerId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(isDense: true),
-                    items: otherOfficers.map((o) {
-                      return DropdownMenuItem(
-                        value: o.id,
-                        child: Text(o.namaLengkap, style: const TextStyle(fontSize: 12)),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) setDialogState(() => targetOfficerId = val);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Tanggal & Shift Pengganti yang Diambil
-                  const Text('Tanggal & Shift Pengganti:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: targetDate,
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 60)),
-                            );
-                            if (picked != null) {
-                              setDialogState(() => targetDate = picked);
-                            }
-                          },
-                          icon: const Icon(Icons.calendar_today, size: 14),
-                          label: Text(DateFormat('dd/MM/yy').format(targetDate), style: const TextStyle(fontSize: 12)),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: targetShift,
-                          isExpanded: true,
-                          decoration: const InputDecoration(isDense: true),
-                          items: const [
-                            DropdownMenuItem(value: 'Shift Malam (22:00 - 04:00)', child: Text('Malam', style: TextStyle(fontSize: 12))),
-                            DropdownMenuItem(value: 'Shift Sore (16:00 - 22:00)', child: Text('Sore', style: TextStyle(fontSize: 12))),
-                            DropdownMenuItem(value: 'Shift Siang (08:00 - 16:00)', child: Text('Siang', style: TextStyle(fontSize: 12))),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) setDialogState(() => targetShift = val);
-                          },
+                        Text(
+                          DateFormat('dd/MM HH:mm').format(req.createdAt),
+                          style: const TextStyle(fontSize: 10, color: Colors.grey),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Menawarkan: ${req.requesterShift}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      'Menggantikan jadwal Anda: ${req.targetShift} (${req.targetDate != null ? DateFormat("dd MMMM yyyy", "id_ID").format(req.targetDate!) : "Jadwal Terjadwal"})',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    if (req.alasan.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Alasan: "${req.alasan}"',
+                        style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.black87),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Alasan Pertukaran
-                  TextField(
-                    controller: noteController,
-                    decoration: const InputDecoration(
-                      labelText: 'Alasan Pertukaran',
-                      isDense: true,
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            foregroundColor: AppColors.emergency,
+                            side: const BorderSide(color: AppColors.emergency),
+                          ),
+                          onPressed: () {
+                            ronda.respondShiftSwap(requestId: req.id, isAccepted: false);
+                          },
+                          child: const Text('Tolak', style: TextStyle(fontSize: 12)),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            backgroundColor: AppColors.verified,
+                          ),
+                          onPressed: () {
+                            ronda.respondShiftSwap(requestId: req.id, isAccepted: true);
+                          },
+                          child: const Text('Terima & Tukar', style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
                     ),
-                    maxLines: 2,
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 10),
+        ],
+
+        // Permintaan Keluar (Outgoing Requests)
+        if (outgoing.isNotEmpty) ...[
+          const Text(
+            'Pengajuan Saya ke Rekan Lain:',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey),
+          ),
+          const SizedBox(height: 6),
+          ...outgoing.take(3).map((req) {
+            Color statusColor;
+            String statusLabel;
+            switch (req.status) {
+              case ShiftSwapStatus.pending:
+                statusColor = AppColors.patrolAccent;
+                statusLabel = 'Menunggu Respon Rekan';
+                break;
+              case ShiftSwapStatus.acceptedByTarget:
+                statusColor = AppColors.verified;
+                statusLabel = 'Disetujui Rekan (Jadwal Aktif)';
+                break;
+              case ShiftSwapStatus.rejected:
+                statusColor = AppColors.emergency;
+                statusLabel = 'Ditolak Rekan';
+                break;
+              case ShiftSwapStatus.approvedByAdmin:
+                statusColor = AppColors.verified;
+                statusLabel = 'Disahkan RT';
+                break;
+            }
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Kepada: ${req.targetUserName}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                        Text(
+                          '${req.requesterShift} ➔ ${req.targetShift}',
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+                    ),
+                    child: Text(
+                      statusLabel,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
+                    ),
                   ),
                 ],
               ),
+            );
+          }),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildResolvedSosAuditSection(BuildContext context, RondaProvider ronda) {
+    final myResolved = ronda.resolvedEmergencies
+        .where((e) => e.respondedByUserId == ronda.currentUser?.id)
+        .toList();
+
+    if (myResolved.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.history_toggle_off, color: AppColors.verified, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Riwayat Audit Penanganan SOS Saya',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-              FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  final schedId = mySchedules.isNotEmpty ? selectedScheduleId : 'SCHED-DAY-1-JORDI';
-                  ronda.requestShiftSwap(
-                    scheduleId: schedId,
-                    targetUserId: targetOfficerId,
-                    alasan: noteController.text.trim(),
-                    targetDate: targetDate,
-                    targetShift: targetShift,
-                  );
-                },
-                child: const Text('Kirim Pengajuan'),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...myResolved.take(3).map((event) {
+          final durResolve = event.durationToResolve != null
+              ? '${event.durationToResolve!.inMinutes} menit'
+              : '-';
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.verifiedLight,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'SELESAI TERTANGANI',
+                          style: TextStyle(color: AppColors.verified, fontWeight: FontWeight.bold, fontSize: 10),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        event.resolvedAt != null ? DateFormat('dd/MM HH:mm').format(event.resolvedAt!) : '',
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Warga Pelapor: ${event.userName} (${event.userAddress})',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Metode Selesai: ${event.resolvedVia?.label ?? "Verifikasi Fisik"} • Durasi Tanggap: $durResolve',
+                    style: const TextStyle(fontSize: 11, color: Colors.black87),
+                  ),
+                  if (event.resolutionNotes != null && event.resolutionNotes!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Catatan: "${event.resolutionNotes}"',
+                        style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+                      ),
+                    ),
+                ],
               ),
-            ],
+            ),
           );
-        },
-      ),
+        }),
+      ],
+    );
+  }
+
+  /// Dialog Pengajuan Tukar Jadwal Interaktif menggunakan Kalender Dinamis
+  void _showRichShiftSwapDialog(BuildContext context, RondaProvider ronda) {
+    DynamicRosterCalendarDialog.show(
+      context: context,
+      mode: CalendarDialogMode.officerSwap,
     );
   }
 }

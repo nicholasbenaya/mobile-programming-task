@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/ronda/models/ronda_models.dart';
 import '../../../providers/ronda_provider.dart';
+import 'widgets/dynamic_roster_calendar_dialog.dart';
 import 'widgets/patrol_calendar_widget.dart';
+import 'widgets/patrol_interactive_map.dart';
 
 /// Dasbor Utama Khusus Ketua RT (Admin): Berpusat pada Pengawasan, Log Real-time, Verifikasi Laporan & Persetujuan
 class AdminRtDashboard extends StatelessWidget {
@@ -69,33 +71,41 @@ class AdminRtDashboard extends StatelessWidget {
           _buildSummaryCards(context, ronda, activeSos.length, pendingSwaps.length, onDutyOfficers.length),
           const SizedBox(height: 16),
 
-          // 2. Kejelasan Jadwal: Petugas yang Sedang Berjaga Hari Ini
+          // 2. Peta Interaktif Patroli Wilayah RT
+          _buildPatrolMapCard(context, ronda),
+          const SizedBox(height: 16),
+
+          // 3. Kejelasan Jadwal: Petugas yang Sedang Berjaga Hari Ini
           _buildTonightRosterCard(context, ronda, onDutyOfficers),
           const SizedBox(height: 16),
 
-          // 3. Banner Darurat Aktif (Jika ada SOS) dengan Fitur Broadcast Ketua RT
+          // 4. Banner Darurat Aktif (Jika ada SOS) dengan Fitur Broadcast Ketua RT
           if (activeSos.isNotEmpty) ...[
             _buildActiveSosSection(context, ronda, activeSos),
             const SizedBox(height: 16),
           ],
 
-          // 4. Pengawasan Pos Patroli & Peringatan Check-in Manual
+          // 5. Pengawasan Pos Patroli & Peringatan Check-in Manual
           _buildCheckpointSupervisionCard(context, ronda, overdueCps),
           const SizedBox(height: 16),
 
-          // 5. Kalender & Manajemen Jadwal Ronda (Auto-Scheduler 5-1 + Manual Assign)
+          // 6. Kalender & Manajemen Jadwal Ronda (Auto-Scheduler 5-1 + Manual Assign)
           PatrolCalendarWidget(ronda: ronda, allowAdminManagement: true),
           const SizedBox(height: 16),
 
-          // 6. Persetujuan Perpindahan Jadwal (Shift Swap Approval)
+          // 7. Log Mutasi Jadwal Ronda (Laporan Pertukaran Rekan Petugas)
           _buildShiftSwapSection(context, ronda, pendingSwaps),
           const SizedBox(height: 16),
 
-          // 7. Log Check-in Patroli Petugas (Live Audit Feed)
+          // 8. Riwayat Audit Penanganan Darurat (SOS) Selesai
+          _buildResolvedSosAuditSection(context, ronda),
+          const SizedBox(height: 16),
+
+          // 9. Log Check-in Patroli Petugas (Live Audit Feed)
           _buildPatrolLogSection(context, ronda),
           const SizedBox(height: 16),
 
-          // 8. Linimasa Insiden Berfoto
+          // 10. Linimasa Insiden Berfoto
           _buildIncidentSection(context, ronda),
         ],
       ),
@@ -211,9 +221,17 @@ class AdminRtDashboard extends StatelessWidget {
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                 ),
-                Text(
-                  DateFormat('dd/MM/yyyy').format(now),
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  onPressed: () => DynamicRosterCalendarDialog.show(
+                    context: context,
+                    mode: CalendarDialogMode.adminAssign,
+                  ),
+                  icon: const Icon(Icons.calendar_month, size: 16),
+                  label: const Text('Atur di Kalender', style: TextStyle(fontSize: 11)),
                 ),
               ],
             ),
@@ -758,41 +776,98 @@ class AdminRtDashboard extends StatelessWidget {
     );
   }
 
+  Widget _buildPatrolMapCard(BuildContext context, RondaProvider ronda) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.map, color: AppColors.secondary, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Peta Pemantauan Patroli Siskamling RT',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+                Text(
+                  '${ronda.checkpoints.length} Pos Ronda Terdaftar',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(
+            height: 230,
+            child: PatrolInteractiveMap(height: 230),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildShiftSwapSection(BuildContext context, RondaProvider ronda, List<ShiftSwapRequest> list) {
+    final allSwaps = ronda.shiftSwaps;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(Icons.swap_horiz, color: AppColors.secondary, size: 22),
+            const Icon(Icons.sync_alt, color: AppColors.secondary, size: 22),
             const SizedBox(width: 8),
             const Expanded(
               child: Text(
-                'Approval Pertukaran Jadwal Ronda',
+                'Log Mutasi Jadwal Patroli (Persetujuan Rekan)',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
-            Text('${list.length} Pengajuan', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text('${allSwaps.length} Entri', style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
+        const SizedBox(height: 6),
+        const Text(
+          'Pertukaran jadwal langsung berlaku saat disetujui rekan bersangkutan (Peer Consent) tanpa birokrasi, tercatat di log audit RT.',
+          style: TextStyle(fontSize: 11, color: Colors.grey),
+        ),
         const SizedBox(height: 10),
-        if (list.isEmpty)
+        if (allSwaps.isEmpty)
           const Card(
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Center(
-                child: Text('Tidak ada permohonan pertukaran jadwal yang tertunda.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                child: Text('Belum ada riwayat mutasi / pertukaran jadwal antar petugas.', style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             ),
           )
         else
-          ...list.map((req) {
-            final isReadyForAdmin = req.status == ShiftSwapStatus.acceptedByTarget;
+          ...allSwaps.take(4).map((req) {
+            Color statusColor;
+            String statusText;
+            switch (req.status) {
+              case ShiftSwapStatus.acceptedByTarget:
+              case ShiftSwapStatus.approvedByAdmin:
+                statusColor = AppColors.verified;
+                statusText = 'Disetujui Rekan (Jadwal Aktif)';
+                break;
+              case ShiftSwapStatus.rejected:
+                statusColor = AppColors.emergency;
+                statusText = 'Ditolak Rekan';
+                break;
+              case ShiftSwapStatus.pending:
+                statusColor = AppColors.patrolAccent;
+                statusText = 'Menunggu Respon Rekan';
+                break;
+            }
 
             return Card(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: const EdgeInsets.only(bottom: 8),
               child: Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -807,46 +882,123 @@ class AdminRtDashboard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: isReadyForAdmin ? AppColors.verifiedLight : AppColors.patrolAccentLight,
+                            color: statusColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.5)),
                           ),
                           child: Text(
-                            isReadyForAdmin ? 'Siap Disahkan RT' : 'Menunggu Pengganti',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: isReadyForAdmin ? AppColors.verified : AppColors.patrolAccent,
-                            ),
+                            statusText,
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text('Alasan: "${req.alasan}"', style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
-                    if (req.targetDate != null)
-                      Text('Tanggal & Shift Baru: ${DateFormat("dd/MM/yyyy").format(req.targetDate!)} (${req.targetShift})', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                    if (isReadyForAdmin) ...[
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
-                              onPressed: () => ronda.approveShiftSwap(requestId: req.id, isApproved: false),
-                              child: const Text('Tolak', style: TextStyle(fontSize: 12)),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: FilledButton(
-                              style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight, visualDensity: VisualDensity.compact),
-                              onPressed: () => ronda.approveShiftSwap(requestId: req.id, isApproved: true),
-                              child: const Text('Sahkan Jadwal', style: TextStyle(fontSize: 12)),
-                            ),
-                          ),
-                        ],
+                    Text(
+                      'Shift: ${req.requesterShift} ➔ ${req.targetShift}'
+                      '${req.targetDate != null ? " (${DateFormat("dd/MM/yyyy").format(req.targetDate!)})" : ""}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    if (req.alasan.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Alasan: "${req.alasan}"',
+                          style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+                        ),
                       ),
-                    ],
+                  ],
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildResolvedSosAuditSection(BuildContext context, RondaProvider ronda) {
+    final resolvedList = ronda.resolvedEmergencies;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.verified_user, color: AppColors.verified, size: 22),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Riwayat Audit Penanganan Darurat (SOS) Selesai',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+            ),
+            Text('${resolvedList.length} Selesai', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (resolvedList.isEmpty)
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(
+                child: Text('Belum ada riwayat insiden darurat yang diselesaikan.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ),
+            ),
+          )
+        else
+          ...resolvedList.take(4).map((event) {
+            final durRespond = event.durationToRespond != null
+                ? '${event.durationToRespond!.inMinutes}m'
+                : '-';
+            final durResolve = event.durationToResolve != null
+                ? '${event.durationToResolve!.inMinutes}m'
+                : '-';
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.verifiedLight,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'SELESAI - ${event.resolvedVia?.label ?? "Verifikasi"}',
+                            style: const TextStyle(color: AppColors.verified, fontWeight: FontWeight.bold, fontSize: 10),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          event.resolvedAt != null ? DateFormat('dd/MM/yy HH:mm').format(event.resolvedAt!) : '',
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Pelapor: ${event.userName} (${event.userAddress})',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Petugas Penangan: ${event.respondedByUserName ?? "-"} • Respon: $durRespond • Penyelesaian: $durResolve',
+                      style: const TextStyle(fontSize: 11, color: Colors.black87),
+                    ),
+                    if (event.resolutionNotes != null && event.resolutionNotes!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Catatan: "${event.resolutionNotes}"',
+                          style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+                        ),
+                      ),
                   ],
                 ),
               ),

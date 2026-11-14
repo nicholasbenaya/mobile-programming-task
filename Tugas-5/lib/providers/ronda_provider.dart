@@ -49,7 +49,31 @@ class RondaProvider extends ChangeNotifier {
   List<IncidentReport> get incidents => _backend.incidents;
   List<ShiftSwapRequest> get shiftSwaps => _backend.shiftSwaps;
   List<EmergencyEvent> get emergencyEvents => _backend.emergencyEvents;
+  List<EmergencyEvent> get resolvedEmergencies => _backend.resolvedEmergencies;
   List<RondaNotification> get notifications => _backend.notifications;
+
+  /// Permintaan tukar jadwal yang masuk (ditujukan kepada saya & masih pending)
+  List<ShiftSwapRequest> get myIncomingSwapRequests {
+    if (_currentUser == null) return [];
+    return shiftSwaps
+        .where((s) => s.targetUserId == _currentUser!.id && s.status == ShiftSwapStatus.pending)
+        .toList();
+  }
+
+  /// Permintaan tukar jadwal yang diajukan oleh saya
+  List<ShiftSwapRequest> get myOutgoingSwapRequests {
+    if (_currentUser == null) return [];
+    return shiftSwaps.where((s) => s.requesterId == _currentUser!.id).toList();
+  }
+
+  /// Riwayat mutasi tukar jadwal yang telah disetujui rekan untuk audit RT
+  List<ShiftSwapRequest> get completedSwapLogs {
+    return shiftSwaps
+        .where((s) =>
+            s.status == ShiftSwapStatus.acceptedByTarget ||
+            s.status == ShiftSwapStatus.approvedByAdmin)
+        .toList();
+  }
 
   /// Daftar petugas ronda yang terdaftar di RT
   List<RondaUser> get allOfficers =>
@@ -95,16 +119,46 @@ class RondaProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// Evaluasi status jadwal pos checkpoint (Sebelum, Saat, Terlewat, Selesai)
-  CheckpointScheduleStatus getCheckpointStatus(Checkpoint cp, [DateTime? time]) {
+  /// Evaluasi status jadwal pos checkpoint untuk petugas tertentu (Default: currentUser)
+  CheckpointScheduleStatus getOfficerCheckpointStatus(
+    Checkpoint cp, {
+    String? userId,
+    DateTime? time,
+  }) {
+    final targetUserId = userId ?? _currentUser?.id;
     final now = time ?? DateTime.now();
+
     final hasCheckedIn = patrolLogs.any((log) =>
         log.checkpointId == cp.id &&
+        (targetUserId == null || log.userId == targetUserId) &&
         log.scannedAt.year == now.year &&
         log.scannedAt.month == now.month &&
         log.scannedAt.day == now.day);
 
-    return cp.calculateStatus(currentTime: now, hasCheckedIn: hasCheckedIn);
+    // Cari jadwal shift petugas bersangkutan untuk menentukan target waktu checkpoint proporsional
+    final userSched = schedules.where((s) =>
+        s.userId == targetUserId &&
+        !s.isLibur &&
+        s.tanggalRonda.year == now.year &&
+        s.tanggalRonda.month == now.month &&
+        s.tanggalRonda.day == now.day).firstOrNull;
+
+    final cpIdx = _checkpoints.indexOf(cp);
+    final targetTime = userSched?.getTargetTimeForCheckpoint(
+      cpIdx >= 0 ? cpIdx : 0,
+      _checkpoints.length,
+    ) ?? cp.targetWaktuCheckin;
+
+    return cp.calculateStatus(
+      currentTime: now,
+      hasCheckedIn: hasCheckedIn,
+      customTargetTime: targetTime,
+    );
+  }
+
+  /// Evaluasi status jadwal pos checkpoint untuk petugas yang sedang aktif
+  CheckpointScheduleStatus getCheckpointStatus(Checkpoint cp, [DateTime? time]) {
+    return getOfficerCheckpointStatus(cp, time: time);
   }
 
   /// Daftar pos yang terlambat / terlewat belum dipindai
@@ -206,6 +260,7 @@ class RondaProvider extends ChangeNotifier {
           accuracy: item.accuracy,
           batteryLevel: item.batteryLevel,
           scanTime: item.scannedAt,
+          forceDutyOverride: true,
         );
         return true;
       });
@@ -330,6 +385,7 @@ class RondaProvider extends ChangeNotifier {
           userLon: lon,
           accuracy: accuracy,
           batteryLevel: 85.0,
+          forceDutyOverride: _isManualDutyActive,
         );
         _lastSuccessMessage = 'Berhasil! Check-in terverifikasi di ${checkpoint.namaLokasi} (Jarak GPS: ${geofence.distanceMeters.toStringAsFixed(1)}m)';
       } catch (e) {
@@ -545,7 +601,7 @@ class RondaProvider extends ChangeNotifier {
         isAccepted: isAccepted,
       );
       _lastSuccessMessage = isAccepted
-          ? 'Anda menyetujui pertukaran. Menunggu persetujuan akhir dari Ketua RT.'
+          ? 'Pertukaran jadwal berhasil disetujui! Jadwal ronda Anda dan rekan otomatis diperbarui.'
           : 'Pertukaran jadwal telah ditolak.';
       notifyListeners();
     } catch (e) {

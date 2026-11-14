@@ -76,32 +76,70 @@ void main() async {
   );
 
   // -------------------------------------------------------------------------
-  // LANGKAH 3: Check-in Pos 1 (Pos Kamling Utama) - Valid
+  // LANGKAH 3: Validasi Jadwal Shift Individual (Petugas HANYA Boleh Check-in di Jam Dinasnya)
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 3/10] Check-in Pos 1 (Pos Utama) Berjarak ~10m (VALID)');
+  print('\n[LANGKAH 3/10] Validasi Jadwal Shift Individual & Check-in Pos 1');
   final cp1 = backend.getCheckpoints(petugas.rtId).firstWhere((c) => c.id == 'CP-POS-UTAMA');
-  final qrPos1 = QrTokenVerifier.generateQrPayload(
-    checkpointId: cp1.id,
-    secretKey: cp1.secretKey,
-  );
 
   const userLatPos1 = -7.281980;
   const userLonPos1 = 112.795330;
+  final today = DateTime.now();
 
+  // 1. Kasus Devi: Jadwal Shift Sore (16:00 - 22:00).
+  // Coba check-in di jam 02:30 (di luar shift). HARUS DITOLAK!
+  final petugasDevi = SeedData.petugasDevi;
+  final time0230 = DateTime(today.year, today.month, today.day, 2, 30);
+  final qrDevi0230 = QrTokenVerifier.generateQrPayload(checkpointId: cp1.id, secretKey: cp1.secretKey, timestamp: time0230);
+  var deviBlockedOutsideShift = false;
+  try {
+    backend.submitCheckin(
+      checkinId: 'chk-devi-invalid-time',
+      checkpointId: cp1.id,
+      userId: petugasDevi.id,
+      qrPayload: qrDevi0230,
+      userLat: userLatPos1,
+      userLon: userLonPos1,
+      accuracy: 4.5,
+      scanTime: time0230,
+    );
+  } catch (e) {
+    deviBlockedOutsideShift = true;
+    print('  ✓ Shift Enforcement: Devi (Shift 16:00-22:00) dicegah check-in di jam 02:30 ($e)');
+  }
+
+  // 2. Devi check-in di jam dinasnya (18:00 WIB) -> SUKSES!
+  final time1800 = DateTime(today.year, today.month, today.day, 18, 0);
+  final qrDevi1800 = QrTokenVerifier.generateQrPayload(checkpointId: cp1.id, secretKey: cp1.secretKey, timestamp: time1800);
+  final checkinDeviValid = backend.submitCheckin(
+    checkinId: 'chk-devi-valid-time',
+    checkpointId: cp1.id,
+    userId: petugasDevi.id,
+    qrPayload: qrDevi1800,
+    userLat: userLatPos1,
+    userLon: userLonPos1,
+    accuracy: 4.5,
+    scanTime: time1800,
+  );
+  print('  ✓ Devi Berhasil Check-in di Jam Dinasnya (18:00 WIB): Jarak ${checkinDeviValid.distanceMeter.toStringAsFixed(1)}m');
+
+  // 3. Jordi check-in di jam shift malamnya (23:00 WIB) -> SUKSES!
+  final time2300 = DateTime(today.year, today.month, today.day, 23, 0);
+  final qrJordi2300 = QrTokenVerifier.generateQrPayload(checkpointId: cp1.id, secretKey: cp1.secretKey, timestamp: time2300);
   final checkin1 = backend.submitCheckin(
     checkinId: 'chk-night-01',
     checkpointId: cp1.id,
     userId: petugas.id,
-    qrPayload: qrPos1,
+    qrPayload: qrJordi2300,
     userLat: userLatPos1,
     userLon: userLonPos1,
     accuracy: 4.5,
     batteryLevel: 92.0,
+    scanTime: time2300,
   );
 
-  print('  ✓ Check-in Berhasil tercatat: ${cp1.namaLokasi}');
+  print('  ✓ Jordi Berhasil Check-in di Shift Malam (23:00 WIB): ${cp1.namaLokasi}');
   print('  ✓ Jarak terverifikasi: ${checkin1.distanceMeter.toStringAsFixed(1)} m (dalam radius ${cp1.radiusMeter}m)');
-  passCount++;
+  if (deviBlockedOutsideShift) passCount++;
 
   // -------------------------------------------------------------------------
   // LANGKAH 4: Percobaan Curang Scan Pos 2 dari Pos 1 (TOLAK GEOFENCE)
@@ -111,6 +149,7 @@ void main() async {
   final qrPos2 = QrTokenVerifier.generateQrPayload(
     checkpointId: cp2.id,
     secretKey: cp2.secretKey,
+    timestamp: time2300,
   );
 
   var geofenceRejected = false;
@@ -123,6 +162,7 @@ void main() async {
       userLat: userLatPos1,
       userLon: userLonPos1,
       accuracy: 5.0,
+      scanTime: DateTime(today.year, today.month, today.day, 23, 0),
     );
   } catch (e) {
     geofenceRejected = true;
@@ -194,6 +234,7 @@ void main() async {
     adminNotes: 'Bukti memadai, insiden resmi ditutup.',
   );
   print('  ✓ Ketua RT Menyetujui: ${emergencyReal.status.label} (Verified by: ${ketuaRt.namaLengkap})');
+  print('  ✓ Log Audit SOS Selesai: ${backend.resolvedEmergencies.length} insiden terselesaikan (Durasi: ${emergencyReal.durationToResolve?.inSeconds}s)');
   passCount++;
 
   // -------------------------------------------------------------------------
@@ -251,6 +292,7 @@ void main() async {
       accuracy: item.accuracy,
       batteryLevel: item.batteryLevel,
       scanTime: item.scannedAt,
+      forceDutyOverride: true,
     );
     return true;
   });
@@ -260,10 +302,9 @@ void main() async {
   passCount++;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 10: Pengajuan Tukar Jadwal Lengkap (Shift, Tanggal, Rekan)
+  // LANGKAH 10: Peer-to-Peer Shift Swap & Laporan Kejadian Warga (Non-SOS)
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 10/10] Pertukaran Jadwal Lengkap (Pilih Tanggal, Shift, & Pengganti)');
-  final petugasDevi = SeedData.petugasDevi;
+  print('\n[LANGKAH 10/10] Pertukaran Jadwal Peer-to-Peer & Laporan Warga Non-SOS');
   final scheduleDevi = backend.getSchedules(petugasDevi.rtId).firstWhere((s) => s.userId == petugasDevi.id && !s.isLibur);
 
   final swapReq = backend.requestShiftSwap(
@@ -272,25 +313,33 @@ void main() async {
     requesterId: petugasDevi.id,
     targetUserId: petugas.id,
     alasan: 'Ada keperluan mendesak keluarga di luar kota',
-    requesterShift: 'Shift Malam (22:00 - 04:00)',
+    requesterShift: 'Shift Sore (16:00 - 22:00)',
     targetDate: DateTime.now().add(const Duration(days: 3)),
     targetShift: 'Shift Malam (22:00 - 04:00)',
   );
-  print('  ✓ Permintaan dibuat: ${petugasDevi.namaLengkap} tukar dengan ${petugas.namaLengkap} (${swapReq.targetShift})');
+  print('  ✓ Permintaan dibuat: ${petugasDevi.namaLengkap} mengajukan tukar dengan ${petugas.namaLengkap}');
 
+  // Rekan (Jordi) menyetujui -> Mutasi jadwal langsung aktif seketika (Peer-to-Peer Consent)
   backend.respondShiftSwap(
     requestId: swapReq.id,
     responderId: petugas.id,
     isAccepted: true,
   );
-  print('  ✓ Disetujui oleh calon pengganti (${swapReq.status.name})');
+  print('  ✓ Disetujui oleh Rekan Petugas (${swapReq.status.name})');
+  print('  ✓ Mutasi Otomatis Tanpa Birokrasi RT: Jadwal kini resmi atas nama: ${scheduleDevi.petugasName}');
 
-  backend.approveShiftSwap(
-    requestId: swapReq.id,
-    approverRole: UserRole.adminRt,
-    isApproved: true,
+  // Uji Warga Melaporkan Kejadian Non-SOS (Fasilitas Rusak / Lampu Mati)
+  final wargaReport = backend.reportIncident(
+    incidentId: 'inc-civic-001',
+    userId: SeedData.wargaFito.id,
+    category: IncidentCategory.lampuMati,
+    keterangan: 'Lampu jalan di dekat Pos 2 mati, jalanan gelap.',
+    photoPath: '/evidence/lampu_mati.jpg',
+    latitude: -7.282500,
+    longitude: 112.796000,
   );
-  print('  ✓ Disahkan oleh Ketua RT! Jadwal resmi kini atas nama: ${scheduleDevi.petugasName}');
+  print('  ✓ Warga Lapor Non-SOS: [${wargaReport.category.label}] "${wargaReport.keterangan}"');
+  print('  ✓ Log Insiden Lingkungan Tercatat: ${backend.incidents.length} laporan');
   passCount++;
 
   // -------------------------------------------------------------------------

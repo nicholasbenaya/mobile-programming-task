@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../domain/ronda/models/ronda_models.dart';
 import '../../../providers/ronda_provider.dart';
 import 'widgets/patrol_calendar_widget.dart';
+import 'widgets/patrol_interactive_map.dart';
 
 /// Dasbor Utama Khusus Warga: Fokus pada Tombol Panik SOS, QR Verifikasi Darurat, dan Kalender Ronda Lingkungan
 class WargaDashboard extends StatefulWidget {
@@ -104,11 +105,27 @@ class _WargaDashboardState extends State<WargaDashboard> {
             const SizedBox(height: 16),
           ],
 
-          // 4. Kalender & Roster Jadwal Ronda Transparan untuk Warga
+          // 4. Lapor Fasilitas Rusak / Kejadian Warga (Non-Darurat)
+          _buildCivicIncidentReportCard(context, ronda),
+          const SizedBox(height: 16),
+
+          // 5. Peta Interaktif Wilayah RT & Pos Ronda
+          _buildPatrolMapCard(context, ronda),
+          const SizedBox(height: 16),
+
+          // 6. Kalender & Roster Jadwal Ronda Transparan untuk Warga
           PatrolCalendarWidget(ronda: ronda, allowAdminManagement: false),
           const SizedBox(height: 16),
 
-          // 5. Kontak Darurat Lingkungan RT
+          // 7. Riwayat Audit Penanganan Darurat SOS Selesai
+          _buildResolvedSosAuditSection(context, ronda),
+          const SizedBox(height: 16),
+
+          // 8. Riwayat Laporan Kejadian Warga
+          _buildCivicIncidentsHistory(context, ronda),
+          const SizedBox(height: 16),
+
+          // 9. Kontak Darurat Lingkungan RT
           _buildEmergencyContactsCard(context),
         ],
       ),
@@ -398,6 +415,321 @@ class _WargaDashboardState extends State<WargaDashboard> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPatrolMapCard(BuildContext context, RondaProvider ronda) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.location_searching, color: AppColors.secondary, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Peta Pos Ronda & Keamanan Lingkungan',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+                Text(
+                  '${ronda.checkpoints.length} Pos Ronda',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(
+            height: 220,
+            child: PatrolInteractiveMap(height: 220),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCivicIncidentReportCard(BuildContext context, RondaProvider ronda) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.build_circle_outlined, color: AppColors.patrolAccent, size: 22),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Lapor Fasilitas Rusak / Masalah Lingkungan',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondaryContainer,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text('Non-SOS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Laporkan lampu penerangan jalan mati, fasilitas umum rusak, tumpukan sampah liar, atau saluran got mampet kepada pengurus RT dan petugas patroli.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.patrolAccent),
+                  foregroundColor: AppColors.patrolAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () => _showReportCivicDialog(context, ronda),
+                icon: const Icon(Icons.add_photo_alternate, size: 18),
+                label: const Text('Buat Laporan Fasilitas / Lingkungan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showReportCivicDialog(BuildContext context, RondaProvider ronda) {
+    final noteController = TextEditingController();
+    IncidentCategory selectedCategory = IncidentCategory.fasilitasRusak;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.report_problem, color: AppColors.patrolAccent),
+                SizedBox(width: 8),
+                Text('Laporan Warga', style: TextStyle(fontSize: 16)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Pilih Kategori Masalah:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<IncidentCategory>(
+                    initialValue: selectedCategory,
+                    isExpanded: true,
+                    decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: IncidentCategory.fasilitasRusak, child: Text('Fasilitas Umum Rusak', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: IncidentCategory.lampuMati, child: Text('Lampu Penerangan Mati', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: IncidentCategory.sampah, child: Text('Tumpukan Sampah / Saluran Tersumbat', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: IncidentCategory.orangMencurigakan, child: Text('Aktivitas Mencurigakan', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: IncidentCategory.lainnya, child: Text('Masalah Lainnya', style: TextStyle(fontSize: 12))),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => selectedCategory = val);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Keterangan & Lokasi Kejadian:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: noteController,
+                    decoration: const InputDecoration(
+                      hintText: 'Contoh: Lampu tiang no 3 di gang buntu mati sudah 2 hari...',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.photo_camera, size: 20, color: Colors.grey),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Foto bukti lampiran kamera otomatis disertakan via GPS.',
+                            style: TextStyle(fontSize: 11, color: Colors.black87),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
+                onPressed: () {
+                  final text = noteController.text.trim();
+                  if (text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Harap tuliskan keterangan laporan.')),
+                    );
+                    return;
+                  }
+                  Navigator.pop(ctx);
+                  ronda.reportIncident(
+                    category: selectedCategory,
+                    keterangan: text,
+                    photoPath: '/storage/emulated/0/DCIM/laporan_warga_${DateTime.now().millisecondsSinceEpoch}.jpg',
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Laporan warga berhasil dikirim ke Pengurus RT & Petugas Ronda!'),
+                      backgroundColor: AppColors.verified,
+                    ),
+                  );
+                },
+                child: const Text('Kirim Laporan'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCivicIncidentsHistory(BuildContext context, RondaProvider ronda) {
+    final myIncidents = ronda.incidents.where((i) => i.userId == ronda.currentUser?.id).toList();
+    if (myIncidents.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.fact_check, color: AppColors.secondary, size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              'Riwayat Laporan Temuan Warga Saya',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const Spacer(),
+            Text('${myIncidents.length} Laporan', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...myIncidents.take(3).map((report) {
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    backgroundColor: AppColors.patrolAccentLight,
+                    radius: 16,
+                    child: const Icon(Icons.build, size: 16, color: AppColors.patrolAccent),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              report.category.label,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            const Spacer(),
+                            Text(
+                              DateFormat('dd/MM HH:mm').format(report.createdAt),
+                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          report.keterangan,
+                          style: const TextStyle(fontSize: 12, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildResolvedSosAuditSection(BuildContext context, RondaProvider ronda) {
+    final resolved = ronda.resolvedEmergencies;
+    if (resolved.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.health_and_safety, color: AppColors.verified, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Transparansi Penanganan Darurat RT (Selesai)',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...resolved.take(2).map((event) {
+          final dur = event.durationToResolve != null ? '${event.durationToResolve!.inMinutes} menit' : '-';
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: AppColors.verified, size: 24),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Darurat: ${event.userName} (${event.userAddress})',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                        Text(
+                          'Tertangani oleh: ${event.respondedByUserName ?? "Petugas"} • Durasi: $dur',
+                          style: const TextStyle(fontSize: 11, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 

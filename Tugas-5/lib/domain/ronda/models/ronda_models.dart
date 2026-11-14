@@ -106,13 +106,15 @@ enum EmergencyResolutionType {
   }
 }
 
-/// Kategori Insiden / Temuan Patroli
+/// Kategori Insiden / Temuan Patroli & Laporan Warga
 enum IncidentCategory {
   pencurian,
   kebakaran,
   keributan,
   orangMencurigakan,
   fasilitasRusak,
+  lampuMati,
+  sampah,
   lainnya;
 
   String get label {
@@ -122,18 +124,22 @@ enum IncidentCategory {
       case IncidentCategory.kebakaran:
         return 'Kebakaran / Korsleting';
       case IncidentCategory.keributan:
-        return 'Keributan / Tawuran';
+        return 'Keributan / Gangguan Ketertiban';
       case IncidentCategory.orangMencurigakan:
         return 'Orang Mencurigakan';
       case IncidentCategory.fasilitasRusak:
-        return 'Kerusakan Fasilitas Umum';
+        return 'Kerusakan Fasilitas Umum (Portal/Gapura/Jalan)';
+      case IncidentCategory.lampuMati:
+        return 'Lampu Jalan / Lingkungan Padam';
+      case IncidentCategory.sampah:
+        return 'Sampah Menumpuk / Saluran Tersumbat';
       case IncidentCategory.lainnya:
-        return 'Lainnya';
+        return 'Lainnya / Keluhan Umum';
     }
   }
 }
 
-/// Status Pengajuan Pertukaran Jadwal (Shift Swap State Machine)
+/// Status Pengajuan Pertukaran Jadwal (Shift Swap)
 enum ShiftSwapStatus {
   pending,
   acceptedByTarget,
@@ -143,13 +149,12 @@ enum ShiftSwapStatus {
   String get label {
     switch (this) {
       case ShiftSwapStatus.pending:
-        return 'Menunggu Persetujuan Pengganti';
+        return 'Menunggu Persetujuan Rekan';
       case ShiftSwapStatus.acceptedByTarget:
-        return 'Disetujui Pengganti (Menunggu Ketua RT)';
-      case ShiftSwapStatus.rejected:
-        return 'Ditolak';
       case ShiftSwapStatus.approvedByAdmin:
-        return 'Resmi Disetujui (Jadwal Berpindah)';
+        return 'Disetujui Bersama (Jadwal Resmi Berpindah)';
+      case ShiftSwapStatus.rejected:
+        return 'Ditolak Rekan';
     }
   }
 }
@@ -279,11 +284,13 @@ class Checkpoint {
   CheckpointScheduleStatus calculateStatus({
     DateTime? currentTime,
     bool hasCheckedIn = false,
+    String? customTargetTime,
   }) {
     if (hasCheckedIn) return CheckpointScheduleStatus.selesai;
 
     final now = currentTime ?? DateTime.now();
-    final parts = targetWaktuCheckin.split(':');
+    final timeStr = customTargetTime ?? targetWaktuCheckin;
+    final parts = timeStr.split(':');
     final targetHour = int.tryParse(parts[0]) ?? 22;
     final targetMinute = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
 
@@ -410,6 +417,49 @@ class PatrolSchedule {
   final String jamSelesai;
   bool isCompleted;
   bool isLibur;
+
+  /// Memeriksa apakah waktu tertentu berada dalam rentang shift ini
+  bool isTimeInShift(DateTime time) {
+    if (isLibur) return false;
+    final startParts = jamMulai.split(':');
+    final endParts = jamSelesai.split(':');
+    final sH = int.tryParse(startParts[0]) ?? 22;
+    final sM = int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0;
+    final eH = int.tryParse(endParts[0]) ?? 4;
+    final eM = int.tryParse(endParts.length > 1 ? endParts[1] : '0') ?? 0;
+
+    final startMinutes = sH * 60 + sM;
+    final endMinutes = eH * 60 + eM;
+    final currentMinutes = time.hour * 60 + time.minute;
+
+    if (startMinutes <= endMinutes) {
+      // Shift normal dalam 1 hari kalender (misal 16:00 - 22:00 atau 08:00 - 16:00)
+      return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+    } else {
+      // Shift malam melintasi tengah malam (misal 22:00 - 04:00)
+      return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+    }
+  }
+
+  /// Menghasilkan target jam checkpoint proporsional khusus shift ini
+  String getTargetTimeForCheckpoint(int cpIndex, int totalCheckpoints) {
+    final startParts = jamMulai.split(':');
+    final endParts = jamSelesai.split(':');
+    final sH = int.tryParse(startParts[0]) ?? 22;
+    final sM = int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0;
+    var eH = int.tryParse(endParts[0]) ?? 4;
+    final eM = int.tryParse(endParts.length > 1 ? endParts[1] : '0') ?? 0;
+    if (eH <= sH) eH += 24;
+
+    final startMin = sH * 60 + sM;
+    final endMin = eH * 60 + eM;
+    final duration = endMin - startMin;
+
+    final offsetMin = startMin + ((duration * (cpIndex + 1)) ~/ (totalCheckpoints + 1));
+    final normalizedHour = (offsetMin ~/ 60) % 24;
+    final normalizedMin = offsetMin % 60;
+    return '${normalizedHour.toString().padLeft(2, '0')}:${normalizedMin.toString().padLeft(2, '0')}';
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -610,6 +660,9 @@ class EmergencyEvent {
   bool get isOnGoing => status == EmergencyStatus.onGoing;
   bool get isMenungguVerifikasiRt => status == EmergencyStatus.menungguVerifikasiRt;
   bool get isSelesai => status == EmergencyStatus.selesai;
+
+  Duration? get durationToResolve => resolvedAt?.difference(triggeredAt);
+  Duration? get durationToRespond => respondedAt?.difference(triggeredAt);
 
   Map<String, dynamic> toJson() => {
         'id': id,

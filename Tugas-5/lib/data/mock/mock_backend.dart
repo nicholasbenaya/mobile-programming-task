@@ -74,8 +74,40 @@ class MockBackend {
     double? accuracy,
     double? batteryLevel,
     DateTime? scanTime,
+    bool forceDutyOverride = false,
   }) {
     final now = scanTime ?? DateTime.now();
+
+    // 1. Validasi Jadwal Shift Petugas Individual
+    // Petugas HANYA dapat check-in jika terjadwal dinas pada hari ini & waktu scan berada dalam shiftnya
+    if (!forceDutyOverride) {
+      final userSched = _schedules.cast<PatrolSchedule?>().firstWhere(
+        (s) =>
+            s != null &&
+            s.userId == userId &&
+            !s.isLibur &&
+            s.tanggalRonda.year == now.year &&
+            s.tanggalRonda.month == now.month &&
+            s.tanggalRonda.day == now.day,
+        orElse: () => null,
+      );
+
+      if (userSched == null) {
+        throw StateError(
+          'Akses Ditolak: Anda tidak memiliki jadwal dinas aktif pada tanggal ini (atau berstatus libur).',
+        );
+      }
+
+      if (!userSched.isTimeInShift(now)) {
+        final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        throw StateError(
+          'Akses Ditolak: Waktu scan ($timeStr WIB) berada di luar jam dinas Anda '
+          '(${userSched.shiftName}: ${userSched.jamMulai} - ${userSched.jamSelesai} WIB). '
+          'Setiap petugas wajib check-in sesuai jadwal shift masing-masing.',
+        );
+      }
+    }
+
     final checkpoint = _checkpoints.firstWhere(
       (c) => c.id == checkpointId,
       orElse: () => throw ArgumentError('Checkpoint $checkpointId tidak terdaftar.'),
@@ -201,8 +233,9 @@ class MockBackend {
     final generated = <PatrolSchedule>[];
     const shifts = [
       {'name': 'Shift Malam (22:00 - 04:00)', 'start': '22:00', 'end': '04:00'},
-      {'name': 'Shift Sore (16:00 - 22:00)', 'start': '16:00', 'end': '22:00'},
-      {'name': 'Shift Siang (08:00 - 16:00)', 'start': '08:00', 'end': '16:00'},
+      {'name': 'Shift Dini Hari (02:00 - 08:00)', 'start': '02:00', 'end': '08:00'},
+      {'name': 'Shift Sore (16:00 - 23:00)', 'start': '16:00', 'end': '23:00'},
+      {'name': 'Shift Pagi-Siang (08:00 - 16:00)', 'start': '08:00', 'end': '16:00'},
     ];
 
     // Pola 5 hari ronda + 1 hari libur (siklus 6 hari)
@@ -296,10 +329,43 @@ class MockBackend {
     required bool isAccepted,
   }) {
     final request = _shiftSwaps.firstWhere((r) => r.id == requestId);
+    final schedule = _schedules.firstWhere((s) => s.id == request.scheduleId);
+
+    // Cari jadwal targetUser jika ada targetDate untuk mutasi 2 arah
+    PatrolSchedule? targetSchedule;
+    if (request.targetDate != null) {
+      targetSchedule = _schedules.cast<PatrolSchedule?>().firstWhere(
+        (s) =>
+            s != null &&
+            s.userId == responderId &&
+            s.tanggalRonda.year == request.targetDate!.year &&
+            s.tanggalRonda.month == request.targetDate!.month &&
+            s.tanggalRonda.day == request.targetDate!.day,
+        orElse: () => null,
+      );
+    }
+
     ShiftSwapManager.respondByTargetUser(
       request: request,
+      schedule: schedule,
       respondingUserId: responderId,
       isAccepted: isAccepted,
+      targetSchedule: targetSchedule,
+    );
+
+    // Log notifikasi audit untuk Ketua RT dan para pihak
+    _notifications.insert(
+      0,
+      RondaNotification(
+        id: 'notif-swap-${DateTime.now().millisecondsSinceEpoch}',
+        rtId: schedule.rtId,
+        title: isAccepted ? 'Mutasi Jadwal: Pertukaran Disetujui' : 'Permintaan Tukar Ditolak',
+        body: isAccepted
+            ? 'Pertukaran jadwal antara ${request.requesterName} dan ${request.targetUserName} disetujui oleh rekan bersangkutan dan jadwal patroli otomatis diperbarui.'
+            : '${request.targetUserName} menolak permohonan tukar jadwal dari ${request.requesterName}.',
+        type: RondaNotificationType.scheduleUpdate,
+        createdAt: DateTime.now(),
+      ),
     );
   }
 
@@ -510,4 +576,6 @@ class MockBackend {
   List<PatrolCheckin> get patrolLogs => List.unmodifiable(_patrolLogs);
   List<IncidentReport> get incidents => List.unmodifiable(_incidents);
   List<EmergencyEvent> get emergencyEvents => List.unmodifiable(_emergencyEvents);
+  List<EmergencyEvent> get resolvedEmergencies =>
+      _emergencyEvents.where((e) => e.status == EmergencyStatus.selesai).toList();
 }

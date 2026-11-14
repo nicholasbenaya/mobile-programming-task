@@ -44,11 +44,15 @@ class ShiftSwapManager {
     );
   }
 
-  /// Respon dari warga pengganti yang ditargetkan (Setuju / Tolak)
+  /// Respon dari rekan petugas pengganti yang ditargetkan (Setuju / Tolak)
+  /// Ketika disetujui, jadwal langsung berpindah secara resmi (Peer-to-Peer Consent)
+  /// tanpa perlu birokrasi approval Ketua RT, namun riwayat dicatat di log Ketua RT.
   static void respondByTargetUser({
     required ShiftSwapRequest request,
     required String respondingUserId,
     required bool isAccepted,
+    PatrolSchedule? schedule,
+    PatrolSchedule? targetSchedule,
   }) {
     if (request.targetUserId != respondingUserId) {
       throw StateError('Hanya pengguna yang ditunjuk yang berhak merespon pertukaran ini.');
@@ -58,10 +62,23 @@ class ShiftSwapManager {
       throw StateError('Permintaan tukar jadwal ini sudah tidak dalam status pending (${request.status.name}).');
     }
 
-    request.status = isAccepted ? ShiftSwapStatus.acceptedByTarget : ShiftSwapStatus.rejected;
+    if (isAccepted) {
+      request.status = ShiftSwapStatus.acceptedByTarget;
+      // Mutasi jadwal langsung aktif ke petugas pengganti
+      if (schedule != null) {
+        schedule.userId = request.targetUserId;
+        schedule.petugasName = request.targetUserName;
+      }
+      if (targetSchedule != null) {
+        targetSchedule.userId = request.requesterId;
+        targetSchedule.petugasName = request.requesterName;
+      }
+    } else {
+      request.status = ShiftSwapStatus.rejected;
+    }
   }
 
-  /// Persetujuan final oleh Ketua RT (Admin) yang memutasi jadwal resmi
+  /// Override opsional persetujuan Ketua RT (jika ada sengketa administratif)
   static void approveByAdmin({
     required ShiftSwapRequest request,
     required PatrolSchedule schedule,
@@ -72,17 +89,12 @@ class ShiftSwapManager {
       throw StateError('Hanya Ketua RT (Admin) yang memiliki wewenang mengesahkan pertukaran jadwal.');
     }
 
-    if (request.status != ShiftSwapStatus.acceptedByTarget) {
-      throw StateError('Pertukaran hanya bisa disahkan admin jika sudah disetujui oleh calon pengganti.');
-    }
-
     if (schedule.id != request.scheduleId) {
       throw ArgumentError('ID Jadwal tidak cocok dengan data permintaan tukar.');
     }
 
     if (isApproved) {
       request.status = ShiftSwapStatus.approvedByAdmin;
-      // Mutasi jadwal resmi ke petugas baru
       schedule.userId = request.targetUserId;
       schedule.petugasName = request.targetUserName;
     } else {

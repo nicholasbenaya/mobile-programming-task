@@ -48,16 +48,19 @@ void main() {
 
       expect(request.status, equals(ShiftSwapStatus.pending));
 
-      // 2. Calon pengganti menyetujui
+      // 2. Calon pengganti menyetujui (Peer-to-Peer consent langsung memutasi jadwal)
       ShiftSwapManager.respondByTargetUser(
         request: request,
         respondingUserId: calonPengganti.id,
         isAccepted: true,
+        schedule: schedule,
       );
 
       expect(request.status, equals(ShiftSwapStatus.acceptedByTarget));
+      expect(schedule.userId, equals(calonPengganti.id));
+      expect(schedule.petugasName, equals(calonPengganti.namaLengkap));
 
-      // 3. Admin RT mengesahkan
+      // 3. Admin RT mengesahkan (opsional / administratif)
       ShiftSwapManager.approveByAdmin(
         request: request,
         schedule: schedule,

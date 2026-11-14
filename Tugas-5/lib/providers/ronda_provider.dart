@@ -25,6 +25,7 @@ class RondaProvider extends ChangeNotifier {
 
   Position? _currentGpsPosition;
   bool _isOfflineMode = false;
+  bool _isManualDutyActive = false;
   bool _isLoadingGps = false;
   String? _lastErrorMessage;
   String? _lastSuccessMessage;
@@ -37,6 +38,7 @@ class RondaProvider extends ChangeNotifier {
   OfflineSyncQueue get offlineQueue => _offlineQueue;
   Position? get currentGpsPosition => _currentGpsPosition;
   bool get isOfflineMode => _isOfflineMode;
+  bool get isManualDutyActive => _isManualDutyActive;
   bool get isLoadingGps => _isLoadingGps;
   String? get lastErrorMessage => _lastErrorMessage;
   String? get lastSuccessMessage => _lastSuccessMessage;
@@ -47,6 +49,79 @@ class RondaProvider extends ChangeNotifier {
   List<IncidentReport> get incidents => _backend.incidents;
   List<ShiftSwapRequest> get shiftSwaps => _backend.shiftSwaps;
   List<EmergencyEvent> get emergencyEvents => _backend.emergencyEvents;
+  List<RondaNotification> get notifications => _backend.notifications;
+
+  /// Daftar petugas ronda yang terdaftar di RT
+  List<RondaUser> get allOfficers =>
+      SeedData.allUsers.where((u) => u.role == UserRole.petugasRonda).toList();
+
+  /// Daftar petugas yang terjadwal piket ronda hari ini (tidak libur)
+  List<RondaUser> get onDutyOfficersToday {
+    final now = DateTime.now();
+    final todaySchedules = schedules.where((s) =>
+        !s.isLibur &&
+        s.tanggalRonda.year == now.year &&
+        s.tanggalRonda.month == now.month &&
+        s.tanggalRonda.day == now.day);
+    final userIds = todaySchedules.map((s) => s.userId).toSet();
+    return SeedData.allUsers.where((u) => userIds.contains(u.id)).toList();
+  }
+
+  /// Cek apakah pengguna saat ini sedang aktif bertugas / berpatroli
+  bool get isCurrentPetugasOnDuty {
+    if (_currentUser == null) return false;
+    if (_currentUser!.role != UserRole.petugasRonda) return false;
+    return _backend.isPetugasOnDuty(_currentUser!.id) || _isManualDutyActive;
+  }
+
+  /// Jadwal shift pengguna saat ini hari ini
+  PatrolSchedule? get myTodaySchedule {
+    if (_currentUser == null) return null;
+    final now = DateTime.now();
+    return schedules.where((s) =>
+        s.userId == _currentUser!.id &&
+        s.tanggalRonda.year == now.year &&
+        s.tanggalRonda.month == now.month &&
+        s.tanggalRonda.day == now.day).firstOrNull;
+  }
+
+  /// Ambil daftar jadwal untuk tanggal tertentu (Kalender Umum)
+  List<PatrolSchedule> getSchedulesForDate(DateTime date) {
+    return schedules
+        .where((s) =>
+            s.tanggalRonda.year == date.year &&
+            s.tanggalRonda.month == date.month &&
+            s.tanggalRonda.day == date.day)
+        .toList();
+  }
+
+  /// Evaluasi status jadwal pos checkpoint (Sebelum, Saat, Terlewat, Selesai)
+  CheckpointScheduleStatus getCheckpointStatus(Checkpoint cp, [DateTime? time]) {
+    final now = time ?? DateTime.now();
+    final hasCheckedIn = patrolLogs.any((log) =>
+        log.checkpointId == cp.id &&
+        log.scannedAt.year == now.year &&
+        log.scannedAt.month == now.month &&
+        log.scannedAt.day == now.day);
+
+    return cp.calculateStatus(currentTime: now, hasCheckedIn: hasCheckedIn);
+  }
+
+  /// Daftar pos yang terlambat / terlewat belum dipindai
+  List<Checkpoint> get overdueCheckpoints {
+    return _checkpoints
+        .where((cp) => getCheckpointStatus(cp) == CheckpointScheduleStatus.terlewat)
+        .toList();
+  }
+
+  /// Toggle manual status bertugas (misal tugas darurat lapangan)
+  void toggleManualDuty(bool value) {
+    _isManualDutyActive = value;
+    _lastSuccessMessage = _isManualDutyActive
+        ? 'Status Bertugas DIAKTIFKAN: Anda kini siap merespons alarm darurat SOS.'
+        : 'Status Bertugas DINONAKTIFKAN.';
+    notifyListeners();
+  }
 
   /// Insiden darurat aktif di lingkungan RT
   List<EmergencyEvent> get activeEmergencies =>
@@ -301,10 +376,15 @@ class RondaProvider extends ChangeNotifier {
   }
 
   /// Petugas merespons insiden (Status beralih ke: ON-GOING)
-  void respondEmergency(String eventId) {
+  /// Hanya petugas yang terjadwal/sedang bertugas yang berhak merespons.
+  void respondEmergency(String eventId, {bool forceDutyOverride = false}) {
     if (_currentUser == null) return;
     try {
-      _backend.respondEmergency(eventId: eventId, responderId: _currentUser!.id);
+      _backend.respondEmergency(
+        eventId: eventId,
+        responderId: _currentUser!.id,
+        forceDutyOverride: forceDutyOverride || _isManualDutyActive,
+      );
       _lastSuccessMessage = 'Anda telah menyatakan merespons insiden. Segera menuju ke lokasi warga.';
       notifyListeners();
     } catch (e) {
@@ -425,13 +505,16 @@ class RondaProvider extends ChangeNotifier {
   }
 
   // ==========================================
-  // 5. TUKAR JADWAL (SHIFT SWAP)
+  // 5. TUKAR JADWAL (SHIFT SWAP) LENGKAP
   // ==========================================
 
   void requestShiftSwap({
     required String scheduleId,
     required String targetUserId,
     required String alasan,
+    String? requesterShift,
+    DateTime? targetDate,
+    String? targetShift,
   }) {
     if (_currentUser == null) return;
     try {
@@ -441,6 +524,9 @@ class RondaProvider extends ChangeNotifier {
         requesterId: _currentUser!.id,
         targetUserId: targetUserId,
         alasan: alasan,
+        requesterShift: requesterShift,
+        targetDate: targetDate,
+        targetShift: targetShift,
       );
       _lastSuccessMessage = 'Permintaan tukar jadwal terkirim ke petugas pengganti.';
       notifyListeners();
@@ -479,6 +565,112 @@ class RondaProvider extends ChangeNotifier {
       _lastSuccessMessage = isApproved
           ? 'Perpindahan jadwal resmi disetujui. Jadwal patroli telah diperbarui.'
           : 'Pengajuan perpindahan jadwal ditolak.';
+      notifyListeners();
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      notifyListeners();
+    }
+  }
+
+  // ==========================================
+  // 6. MANAJEMEN JADWAL & BROADCAST KETUA RT
+  // ==========================================
+
+  /// Menugaskan jadwal secara manual oleh Ketua RT
+  void assignScheduleManual({
+    required String userId,
+    required DateTime date,
+    required String shiftName,
+    required String jamMulai,
+    required String jamSelesai,
+    bool isLibur = false,
+  }) {
+    if (_currentUser == null || _currentUser!.role != UserRole.adminRt) {
+      _lastErrorMessage = 'Hanya Ketua RT yang memiliki akses manajemen jadwal.';
+      notifyListeners();
+      return;
+    }
+
+    try {
+      _backend.assignScheduleManual(
+        rtId: _currentUser!.rtId,
+        userId: userId,
+        date: date,
+        shiftName: shiftName,
+        jamMulai: jamMulai,
+        jamSelesai: jamSelesai,
+        isLibur: isLibur,
+      );
+      _lastSuccessMessage = 'Jadwal berhasil ditetapkan untuk petugas terpilih.';
+      notifyListeners();
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      notifyListeners();
+    }
+  }
+
+  /// Membuat jadwal bergilir otomatis (5 hari ronda + 1 hari libur)
+  void generateAutoRoster({DateTime? startDate, int daysCount = 30}) {
+    if (_currentUser == null || _currentUser!.role != UserRole.adminRt) {
+      _lastErrorMessage = 'Hanya Ketua RT yang dapat mengatur jadwal otomatis.';
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final list = _backend.generateAutoRoster(
+        rtId: _currentUser!.rtId,
+        startDate: startDate,
+        daysCount: daysCount,
+      );
+      _lastSuccessMessage =
+          'Berhasil membentuk ${list.length} entri jadwal (rotasi 5 hari dinas + 1 libur) untuk $daysCount hari ke depan!';
+      notifyListeners();
+    } catch (e) {
+      _lastErrorMessage = e.toString().replaceAll('StateError: ', '');
+      notifyListeners();
+    }
+  }
+
+  /// Ketua RT mengirim panggilan siaga darurat ke seluruh petugas (berjaga maupun off-duty)
+  void broadcastSosToOfficers({
+    required String eventId,
+    required bool includeOffDuty,
+    String? customMessage,
+  }) {
+    if (_currentUser == null || _currentUser!.role != UserRole.adminRt) return;
+    try {
+      _backend.broadcastSosAlert(
+        rtId: _currentUser!.rtId,
+        eventId: eventId,
+        includeOffDuty: includeOffDuty,
+        customMessage: customMessage,
+      );
+      _lastSuccessMessage = includeOffDuty
+          ? 'Peringatan Darurat dipancarkan ke SELURUH petugas ronda (piket dan cadangan)!'
+          : 'Peringatan Darurat dikirimkan ke petugas yang sedang piket.';
+      notifyListeners();
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      notifyListeners();
+    }
+  }
+
+  /// Ketua RT mengirim peringatan manual untuk pos patroli yang belum di-scan
+  void notifyCheckpointReminder({
+    required String checkpointId,
+    String? targetUserId,
+    String? message,
+  }) {
+    if (_currentUser == null || _currentUser!.role != UserRole.adminRt) return;
+    try {
+      _backend.notifyCheckpointReminder(
+        rtId: _currentUser!.rtId,
+        checkpointId: checkpointId,
+        targetUserId: targetUserId,
+        customMessage: message,
+      );
+      _lastSuccessMessage = 'Pemberitahuan peringatan check-in telah terkirim ke petugas patroli.';
       notifyListeners();
     } catch (e) {
       _lastErrorMessage = e.toString();

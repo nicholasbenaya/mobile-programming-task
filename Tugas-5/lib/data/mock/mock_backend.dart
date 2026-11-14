@@ -21,8 +21,23 @@ class MockBackend {
   final List<IncidentReport> _incidents = [];
   final List<EmergencyEvent> _emergencyEvents = [];
 
+  final List<RondaNotification> _notifications = [];
+
   final SosEventDispatcher _sosDispatcher = SosEventDispatcher(debounceWindowSeconds: 15);
   final List<FcmEmergencyPayload> fcmBroadcastHistory = [];
+
+  List<RondaNotification> get notifications => List.unmodifiable(_notifications);
+
+  /// Cek apakah petugas sedang memiliki jadwal ronda aktif pada tanggal bersangkutan
+  bool isPetugasOnDuty(String userId, [DateTime? currentTime]) {
+    final now = currentTime ?? DateTime.now();
+    return _schedules.any((s) =>
+        s.userId == userId &&
+        !s.isLibur &&
+        s.tanggalRonda.year == now.year &&
+        s.tanggalRonda.month == now.month &&
+        s.tanggalRonda.day == now.day);
+  }
 
   // 1. Auth Endpoint: POST /api/auth/login (Terenkripsi SHA-256)
   RondaUser login({required String whatsapp, required String password}) {
@@ -114,12 +129,147 @@ class MockBackend {
   List<PatrolSchedule> getSchedules(String rtId) =>
       _schedules.where((s) => s.rtId == rtId).toList();
 
+  /// Menugaskan jadwal secara manual oleh Ketua RT
+  PatrolSchedule assignScheduleManual({
+    required String rtId,
+    required String userId,
+    required DateTime date,
+    required String shiftName,
+    required String jamMulai,
+    required String jamSelesai,
+    bool isLibur = false,
+  }) {
+    final user = _users.firstWhere((u) => u.id == userId);
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+
+    // Hapus jadwal eksisting petugas di tanggal tersebut jika ada
+    _schedules.removeWhere((s) =>
+        s.userId == userId &&
+        s.tanggalRonda.year == normalizedDate.year &&
+        s.tanggalRonda.month == normalizedDate.month &&
+        s.tanggalRonda.day == normalizedDate.day);
+
+    final newSched = PatrolSchedule(
+      id: 'SCHED-${userId.toUpperCase()}-${normalizedDate.millisecondsSinceEpoch}',
+      rtId: rtId,
+      userId: userId,
+      petugasName: user.namaLengkap,
+      tanggalRonda: normalizedDate,
+      shiftName: shiftName,
+      jamMulai: jamMulai,
+      jamSelesai: jamSelesai,
+      isLibur: isLibur,
+    );
+
+    _schedules.add(newSched);
+    _schedules.sort((a, b) => a.tanggalRonda.compareTo(b.tanggalRonda));
+
+    // Kirim notifikasi pembaruan jadwal
+    _notifications.insert(
+      0,
+      RondaNotification(
+        id: 'notif-sched-${DateTime.now().millisecondsSinceEpoch}',
+        rtId: rtId,
+        title: 'Jadwal Ronda Ditetapkan',
+        body: 'Ketua RT telah menugaskan Anda (${user.namaLengkap}) pada $shiftName tanggal ${normalizedDate.day}/${normalizedDate.month}/${normalizedDate.year}.',
+        type: RondaNotificationType.scheduleUpdate,
+        targetUserId: userId,
+        createdAt: DateTime.now(),
+      ),
+    );
+
+    return newSched;
+  }
+
+  /// Generator Otomatis Jadwal Ronda (Aturan: 5 Hari Ronda + 1 Hari Libur per Petugas)
+  List<PatrolSchedule> generateAutoRoster({
+    required String rtId,
+    DateTime? startDate,
+    int daysCount = 30,
+  }) {
+    final officers = _users.where((u) => u.rtId == rtId && u.role == UserRole.petugasRonda).toList();
+    if (officers.isEmpty) {
+      throw StateError('Tidak ada petugas ronda terdaftar di RT ini.');
+    }
+
+    final start = startDate ?? DateTime.now();
+    final normalizedStart = DateTime(start.year, start.month, start.day);
+
+    // Hapus jadwal mendatang mulai tanggal start
+    _schedules.removeWhere((s) => s.rtId == rtId && !s.tanggalRonda.isBefore(normalizedStart));
+
+    final generated = <PatrolSchedule>[];
+    const shifts = [
+      {'name': 'Shift Malam (22:00 - 04:00)', 'start': '22:00', 'end': '04:00'},
+      {'name': 'Shift Sore (16:00 - 22:00)', 'start': '16:00', 'end': '22:00'},
+      {'name': 'Shift Siang (08:00 - 16:00)', 'start': '08:00', 'end': '16:00'},
+    ];
+
+    // Pola 5 hari ronda + 1 hari libur (siklus 6 hari)
+    // Berikan stagger offset pada setiap petugas agar libur tidak bersamaan
+    for (int dayIndex = 0; dayIndex < daysCount; dayIndex++) {
+      final targetDate = normalizedStart.add(Duration(days: dayIndex));
+
+      int activeShiftIndex = 0;
+      for (int officerIdx = 0; officerIdx < officers.length; officerIdx++) {
+        final officer = officers[officerIdx];
+        // Siklus 6 hari: 0,1,2,3,4 = Ronda, 5 = Libur
+        final cycleDay = (dayIndex + officerIdx * 2) % 6;
+        final isLibur = cycleDay == 5;
+
+        final shiftInfo = isLibur
+            ? {'name': 'Libur Piket (Hari Istirahat)', 'start': '-', 'end': '-'}
+            : shifts[activeShiftIndex % shifts.length];
+
+        if (!isLibur) {
+          activeShiftIndex++;
+        }
+
+        final sched = PatrolSchedule(
+          id: 'AUTO-${officer.id}-$dayIndex-${targetDate.millisecondsSinceEpoch}',
+          rtId: rtId,
+          userId: officer.id,
+          petugasName: officer.namaLengkap,
+          tanggalRonda: targetDate,
+          shiftName: shiftInfo['name']!,
+          jamMulai: shiftInfo['start']!,
+          jamSelesai: shiftInfo['end']!,
+          isLibur: isLibur,
+        );
+
+        generated.add(sched);
+        _schedules.add(sched);
+      }
+    }
+
+    _schedules.sort((a, b) => a.tanggalRonda.compareTo(b.tanggalRonda));
+
+    // Catat notifikasi pengumuman jadwal umum
+    _notifications.insert(
+      0,
+      RondaNotification(
+        id: 'notif-auto-roster-${DateTime.now().millisecondsSinceEpoch}',
+        rtId: rtId,
+        title: 'Jadwal Ronda Otomatis Disusun',
+        body: 'Jadwal ronda bergilir 5 hari dinas + 1 hari libur untuk $daysCount hari ke depan telah disahkan oleh Ketua RT.',
+        type: RondaNotificationType.scheduleUpdate,
+        includeOffDuty: true,
+        createdAt: DateTime.now(),
+      ),
+    );
+
+    return generated;
+  }
+
   ShiftSwapRequest requestShiftSwap({
     required String requestId,
     required String scheduleId,
     required String requesterId,
     required String targetUserId,
     required String alasan,
+    String? requesterShift,
+    DateTime? targetDate,
+    String? targetShift,
   }) {
     final schedule = _schedules.firstWhere((s) => s.id == scheduleId);
     final requester = _users.firstWhere((u) => u.id == requesterId);
@@ -131,6 +281,9 @@ class MockBackend {
       requester: requester,
       targetUser: target,
       alasan: alasan,
+      requesterShift: requesterShift,
+      targetDate: targetDate,
+      targetShift: targetShift,
     );
 
     _shiftSwaps.insert(0, request);
@@ -189,10 +342,85 @@ class MockBackend {
 
     _emergencyEvents.insert(0, result.event);
     fcmBroadcastHistory.add(result.fcmPayload);
+
+    // Kirim notifikasi darurat internal
+    _notifications.insert(
+      0,
+      RondaNotification(
+        id: 'notif-sos-$eventId',
+        rtId: user.rtId,
+        title: 'PANGGILAN DARURAT (SOS)!',
+        body: '${user.namaLengkap} di ${user.alamatRumah} membutuhkan bantuan segera.',
+        type: RondaNotificationType.sosEmergency,
+        includeOffDuty: true,
+        createdAt: DateTime.now(),
+      ),
+    );
+
     return result.event;
   }
 
-  void respondEmergency({required String eventId, required String responderId}) {
+  /// Broadcast / Notifikasi Darurat Manual oleh Ketua RT
+  void broadcastSosAlert({
+    required String rtId,
+    required String eventId,
+    required bool includeOffDuty,
+    String? customMessage,
+  }) {
+    final event = _emergencyEvents.firstWhere((e) => e.id == eventId);
+    final msg = customMessage ??
+        'PERINTAH KETUA RT: Segera bergerak ke lokasi insiden darurat di ${event.userAddress} (Pelapor: ${event.userName})!';
+
+    _notifications.insert(
+      0,
+      RondaNotification(
+        id: 'broadcast-sos-${DateTime.now().millisecondsSinceEpoch}',
+        rtId: rtId,
+        title: 'DARURAT SOS: Panggilan Khusus Ketua RT',
+        body: msg,
+        type: RondaNotificationType.sosEmergency,
+        includeOffDuty: includeOffDuty,
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  /// Peringatan Check-in Pos Patroli Manual oleh Ketua RT
+  void notifyCheckpointReminder({
+    required String rtId,
+    required String checkpointId,
+    String? targetUserId,
+    String? customMessage,
+  }) {
+    final cp = _checkpoints.firstWhere((c) => c.id == checkpointId);
+    final msg = customMessage ??
+        'Peringatan Ketua RT: Pos ${cp.kodeTitik} (${cp.namaLokasi}) belum dipindai sesuai jadwal (${cp.targetWaktuCheckin} WIB). Harap segera lakukan check-in patroli.';
+
+    _notifications.insert(
+      0,
+      RondaNotification(
+        id: 'chk-reminder-${DateTime.now().millisecondsSinceEpoch}',
+        rtId: rtId,
+        title: 'PERINGATAN CHECK-IN PATROLI',
+        body: msg,
+        type: RondaNotificationType.checkpointReminder,
+        targetUserId: targetUserId,
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  /// Petugas merespons insiden (Hanya yang sedang bertugas yang diperbolehkan)
+  void respondEmergency({
+    required String eventId,
+    required String responderId,
+    bool forceDutyOverride = false,
+  }) {
+    if (!forceDutyOverride && !isPetugasOnDuty(responderId)) {
+      throw StateError(
+          'Akses Ditolak: Hanya petugas yang sedang bertugas/berpatroli aktif hari ini yang berhak merespons darurat SOS.');
+    }
+
     final event = _emergencyEvents.firstWhere((e) => e.id == eventId);
     final responder = _users.firstWhere((u) => u.id == responderId);
     _sosDispatcher.respondEmergency(event, responder: responder);

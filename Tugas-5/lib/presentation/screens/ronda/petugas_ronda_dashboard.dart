@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../domain/ronda/models/ronda_models.dart';
 import '../../../domain/ronda/services/haversine_calculator.dart';
 import '../../../providers/ronda_provider.dart';
+import 'widgets/patrol_calendar_widget.dart';
+import 'widgets/sos_qr_scanner_dialog.dart';
 
 /// Dasbor Utama Khusus Petugas Ronda: Fokus pada Tugas Patroli, Scan Pos Fisik & Respons Darurat SOS
 class PetugasRondaDashboard extends StatelessWidget {
@@ -17,6 +20,8 @@ class PetugasRondaDashboard extends StatelessWidget {
     final user = ronda.currentUser!;
 
     final activeSos = ronda.activeEmergencies;
+    final overdueCps = ronda.overdueCheckpoints;
+    final notifications = ronda.notifications.take(3).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -33,7 +38,7 @@ class PetugasRondaDashboard extends StatelessWidget {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: ronda.isOfflineMode ? Colors.orange : Colors.green,
+                    color: ronda.isOfflineMode ? AppColors.patrolAccent : AppColors.verified,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -64,7 +69,7 @@ class PetugasRondaDashboard extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 1. Banner Pesan Sukses / Error
+          // 1. Pesan Sukses / Error Sistem
           if (ronda.lastErrorMessage != null) ...[
             _buildNotificationBanner(context, ronda.lastErrorMessage!, isError: true),
             const SizedBox(height: 12),
@@ -74,22 +79,38 @@ class PetugasRondaDashboard extends StatelessWidget {
             const SizedBox(height: 12),
           ],
 
-          // 2. Banner Alarm Darurat Aktif (High Priority)
+          // 2. Banner Notifikasi Darurat / Peringatan RT
+          if (notifications.isNotEmpty) ...[
+            _buildInternalNotificationsList(context, notifications),
+            const SizedBox(height: 12),
+          ],
+
+          // 3. Peringatan Pos Patroli Terlewat (Overdue Reminder)
+          if (overdueCps.isNotEmpty) ...[
+            _buildOverdueWarningBanner(context, overdueCps),
+            const SizedBox(height: 14),
+          ],
+
+          // 4. Banner Alarm Darurat Aktif (SOS)
           if (activeSos.isNotEmpty) ...[
             _buildActiveSosAlert(context, ronda, activeSos.first),
             const SizedBox(height: 16),
           ],
 
-          // 3. Status Tugas & Blank Spot Switcher
+          // 5. Status Tugas & Kesiagaan Piket
           _buildDutyStatusCard(context, ronda),
           const SizedBox(height: 16),
 
-          // 4. Daftar Pos Checkpoint Fisik (Patroli QR + Haversine GPS)
+          // 6. Daftar Pos Checkpoint Fisik (Patroli QR + Haversine GPS + Jadwal Pos)
           _buildCheckpointsSection(context, ronda),
           const SizedBox(height: 16),
 
-          // 5. Aksi Lapangan Cepat
+          // 7. Aksi Lapangan Cepat
           _buildQuickActionSection(context, ronda),
+          const SizedBox(height: 20),
+
+          // 8. Kalender & Roster Jadwal Ronda
+          PatrolCalendarWidget(ronda: ronda, allowAdminManagement: false),
         ],
       ),
     );
@@ -100,10 +121,11 @@ class PetugasRondaDashboard extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Konfirmasi Keluar'),
-        content: const Text('Apakah Anda yakin ingin mengakhiri sesi Petugas Ronda?'),
+        content: const Text('Apakah Anda yakin ingin keluar dari sesi Petugas Ronda?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
             onPressed: () {
               Navigator.pop(ctx);
               ronda.logout();
@@ -115,22 +137,108 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildNotificationBanner(BuildContext context, String message, {required bool isError}) {
+  Widget _buildNotificationBanner(BuildContext context, String text, {required bool isError}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: isError ? Colors.red.shade50 : Colors.green.shade50,
+        color: isError ? AppColors.emergencyLight : AppColors.verifiedLight,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: isError ? Colors.red.shade200 : Colors.green.shade200),
+        border: Border.all(color: isError ? AppColors.emergency : AppColors.verified, width: 1),
       ),
       child: Row(
         children: [
-          Icon(isError ? Icons.error_outline : Icons.check_circle_outline, color: isError ? Colors.red : Colors.green, size: 20),
-          const SizedBox(width: 8),
+          Icon(
+            isError ? Icons.error_outline : Icons.check_circle_outline,
+            color: isError ? AppColors.emergency : AppColors.verified,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
-              message,
-              style: TextStyle(color: isError ? Colors.red.shade900 : Colors.green.shade900, fontSize: 12),
+              text,
+              style: TextStyle(
+                color: isError ? AppColors.emergency : AppColors.verified,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInternalNotificationsList(BuildContext context, List<RondaNotification> list) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.patrolAccentLight.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.patrolAccent.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.notifications_active, color: AppColors.patrolAccent, size: 18),
+              const SizedBox(width: 8),
+              const Text(
+                'Pemberitahuan Sistem & Perintah RT',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...list.map((n) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Text(
+                      '${n.title}: ${n.body}',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverdueWarningBanner(BuildContext context, List<Checkpoint> overdueCps) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.emergencyLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.emergency, width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.timer_off_outlined, color: AppColors.emergency, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'PERINGATAN CHECK-IN POS TERLEWAT',
+                  style: TextStyle(color: AppColors.emergency, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Terdapat ${overdueCps.length} pos yang telah melewati jam target patroli belum di-scan: ${overdueCps.map((c) => c.kodeTitik).join(", ")}. Segera menuju lokasi dan lakukan scan.',
+                  style: const TextStyle(color: Color(0xFF7F1D1D), fontSize: 11),
+                ),
+              ],
             ),
           ),
         ],
@@ -139,13 +247,21 @@ class PetugasRondaDashboard extends StatelessWidget {
   }
 
   Widget _buildActiveSosAlert(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
-    final isHandling = event.status == EmergencyStatus.onGoing;
-    final isAwaitingRt = event.status == EmergencyStatus.menungguVerifikasiRt;
+    final isHandling = event.isOnGoing && event.respondedByUserId == ronda.currentUser!.id;
+    final isAwaitingRt = event.isMenungguVerifikasiRt;
 
-    return Card(
-      elevation: 4,
-      color: Colors.red.shade900,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.emergency,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.emergency.withValues(alpha: 0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -153,59 +269,57 @@ class PetugasRondaDashboard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.yellow, size: 28),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'PANGGILAN DARURAT WARGA (SOS)',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      Text(
-                        event.status.label,
-                        style: TextStyle(
-                          color: isHandling ? Colors.yellow : Colors.white70,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                const Icon(Icons.warning, color: Colors.white, size: 24),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'PANGGILAN DARURAT (SOS) AKTIF!',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    event.status.label,
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
             ),
-            const Divider(color: Colors.white24, height: 20),
+            const SizedBox(height: 10),
             Text(
               'Pelapor: ${event.userName}',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
             ),
             Text(
-              'Alamat: ${event.userAddress}',
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              'Lokasi: ${event.userAddress}',
+              style: const TextStyle(color: Colors.white, fontSize: 13),
             ),
             if (event.catatan != null) ...[
               const SizedBox(height: 4),
               Text(
-                'Pesan: "${event.catatan}"',
-                style: const TextStyle(color: Colors.white60, fontSize: 12, fontStyle: FontStyle.italic),
+                'Catatan: "${event.catatan}"',
+                style: const TextStyle(color: Colors.white70, fontSize: 12, fontStyle: FontStyle.italic),
               ),
             ],
             const SizedBox(height: 14),
 
-            // Opsi Aksi Berdasarkan Status
-            if (event.status == EmergencyStatus.belumDitangani) ...[
+            // Tombol Aksi Respons Petugas
+            if (event.isBelumDitangani) ...[
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.yellow.shade700,
-                    foregroundColor: Colors.black,
+                    backgroundColor: Colors.amber.shade400,
+                    foregroundColor: Colors.black87,
                   ),
-                  onPressed: () => ronda.respondEmergency(event.id),
+                  onPressed: () => _handleRespondEmergency(context, ronda, event),
                   icon: const Icon(Icons.directions_run),
-                  label: const Text('SAYA MERESPONS (MENUJU LOKASI)'),
+                  label: const Text('SAYA MERESPONS (MENUJU LOKASI)', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ] else if (isHandling) ...[
@@ -213,16 +327,22 @@ class PetugasRondaDashboard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
-                      onPressed: () => _showScanWargaQrDialog(context, ronda, event),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppColors.primary,
+                      ),
+                      onPressed: () => _openRealQrScanner(context, ronda, event),
                       icon: const Icon(Icons.qr_code_scanner, size: 18),
-                      label: const Text('Scan QR Warga', style: TextStyle(fontSize: 12)),
+                      label: const Text('Pindai QR Warga', style: TextStyle(fontSize: 12)),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white),
+                      ),
                       onPressed: () => _showPhotoResolutionDialog(context, ronda, event),
                       icon: const Icon(Icons.camera_alt, size: 18),
                       label: const Text('Foto Bukti', style: TextStyle(fontSize: 12)),
@@ -243,7 +363,7 @@ class PetugasRondaDashboard extends StatelessWidget {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Bukti foto telah terkirim. Menunggu persetujuan Ketua RT untuk menyelesaikan status.',
+                        'Bukti foto telah terkirim ke Ketua RT. Menunggu pengesahan verifikasi.',
                         style: TextStyle(color: Colors.white, fontSize: 11),
                       ),
                     ),
@@ -257,69 +377,74 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  void _showScanWargaQrDialog(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
+  /// Verifikasi Hak Merespons SOS: Hanya yang sedang bertugas yang boleh merespons
+  void _handleRespondEmergency(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
+    if (ronda.isCurrentPetugasOnDuty) {
+      ronda.respondEmergency(event.id);
+      return;
+    }
+
+    // Jika di luar jam dinas / tidak terjadwal hari ini
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.qr_code_scanner, color: Colors.blue),
+            Icon(Icons.shield_outlined, color: AppColors.patrolAccent),
             SizedBox(width: 8),
-            Text('Scan QR Warga Pelapor'),
+            Text('Status Dinas Petugas', style: TextStyle(fontSize: 16)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Arahkan kamera smartphone ke QR Code yang ditampilkan pada aplikasi warga (${event.userName}).',
-              style: const TextStyle(fontSize: 13),
+            const Text(
+              'Anda saat ini tercatat di luar jadwal ronda aktif hari ini.',
+              style: TextStyle(fontSize: 13),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.blue.shade200),
+                color: AppColors.patrolAccentLight.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, size: 18, color: Colors.blue),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Token Verifikasi Warga:\n${event.verificationQrToken}',
-                      style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: Colors.blue.shade900),
-                    ),
-                  ),
-                ],
+              child: Text(
+                'Jadwal Anda: ${ronda.myTodaySchedule?.shiftName ?? "Tidak ada giliran piket hari ini"}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.patrolAccent),
               ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Apakah Anda ingin mengaktifkan "Mode Siaga Darurat Lapangan" untuk merespons panggilan warga ini?',
+              style: TextStyle(fontSize: 12),
             ),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          FilledButton.icon(
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
             onPressed: () {
               Navigator.pop(ctx);
-              final success = ronda.resolveEmergencyWithQr(
-                eventId: event.id,
-                scannedQrPayload: event.verificationQrToken,
-              );
-              if (success) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Insiden Darurat Resmi SELESAI (Validasi QR Sukses)!')),
-                );
-              }
+              ronda.toggleManualDuty(true);
+              ronda.respondEmergency(event.id);
             },
-            icon: const Icon(Icons.check),
-            label: const Text('Simulasi Scan QR Warga'),
+            child: const Text('Aktifkan Siaga & Respons'),
           ),
         ],
       ),
     );
+  }
+
+  void _openRealQrScanner(BuildContext context, RondaProvider ronda, EmergencyEvent event) async {
+    final result = await SosQrScannerDialog.show(context, ronda, event);
+    if (result == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Insiden Darurat Resmi SELESAI (Validasi QR Warga Berhasil)!')),
+      );
+    }
   }
 
   void _showPhotoResolutionDialog(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
@@ -338,17 +463,17 @@ class PetugasRondaDashboard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Container(
-              height: 120,
+              height: 110,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.grey.shade200,
+                color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade400, style: BorderStyle.solid),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.camera_alt, size: 36, color: Colors.grey.shade700),
+                  Icon(Icons.camera_alt, size: 32, color: Colors.grey.shade700),
                   const SizedBox(height: 4),
                   const Text('Simulasi Kamera Lapangan Siap', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   Text('bukti_penanganan_${event.id}.jpg', style: const TextStyle(fontSize: 10, color: Colors.grey)),
@@ -360,7 +485,7 @@ class PetugasRondaDashboard extends StatelessWidget {
               controller: notesController,
               decoration: const InputDecoration(
                 labelText: 'Keterangan Penanganan',
-                border: OutlineInputBorder(),
+                isDense: true,
               ),
               maxLines: 2,
             ),
@@ -369,6 +494,7 @@ class PetugasRondaDashboard extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
             onPressed: () {
               Navigator.pop(ctx);
               ronda.resolveEmergencyWithPhoto(
@@ -388,27 +514,90 @@ class PetugasRondaDashboard extends StatelessWidget {
   }
 
   Widget _buildDutyStatusCard(BuildContext context, RondaProvider ronda) {
+    final isOnDuty = ronda.isCurrentPetugasOnDuty;
+    final mySched = ronda.myTodaySchedule;
+
     return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade300),
-      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             Row(
               children: [
-                const Icon(Icons.nightlight_round, color: Colors.indigo, size: 24),
-                const SizedBox(width: 10),
+                CircleAvatar(
+                  backgroundColor: isOnDuty ? AppColors.verifiedLight : Colors.grey.shade200,
+                  radius: 20,
+                  child: Icon(
+                    isOnDuty ? Icons.shield : Icons.nightlight_outlined,
+                    color: isOnDuty ? AppColors.verified : Colors.grey.shade700,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            isOnDuty ? 'Sedang Bertugas' : 'Di Luar Jam Dinas',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: isOnDuty ? AppColors.verified : Colors.grey.shade800,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isOnDuty ? AppColors.verifiedLight : Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              isOnDuty ? 'AKTIF' : 'OFF',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: isOnDuty ? AppColors.verified : Colors.grey.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        mySched != null
+                            ? '${mySched.shiftName} (${mySched.jamMulai} - ${mySched.jamSelesai} WIB)'
+                            : 'Tidak ada shift dinas otomatis malam ini',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                      ),
+                    ],
+                  ),
+                ),
+                // Toggle Manual Siaga
+                Column(
+                  children: [
+                    Switch(
+                      value: ronda.isManualDutyActive,
+                      onChanged: (val) => ronda.toggleManualDuty(val),
+                    ),
+                    const Text('Siaga', style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight)),
+                  ],
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              children: [
+                const Icon(Icons.wifi_tethering_off, size: 18, color: AppColors.patrolAccent),
+                const SizedBox(width: 8),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Tugas Jaga Malam Ini', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text('Pukul 22:00 - 04:00 WIB', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text('Mode Blank Spot (Offline)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text('Simulasi area tanpa internet (antrean lokal)', style: TextStyle(fontSize: 10, color: Colors.grey)),
                     ],
                   ),
                 ),
@@ -419,16 +608,23 @@ class PetugasRondaDashboard extends StatelessWidget {
               ],
             ),
             if (ronda.isOfflineMode) ...[
-              const Divider(height: 16),
-              Row(
-                children: [
-                  const Icon(Icons.cloud_off, size: 16, color: Colors.orange),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Simulasi Area Blank Spot aktif (${ronda.offlineQueue.pendingCount} antrean)',
-                    style: const TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold),
-                  ),
-                ],
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.patrolAccentLight,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.cloud_off, size: 14, color: AppColors.patrolAccent),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Antrean scan offline: ${ronda.offlineQueue.pendingCount} rekaman',
+                      style: const TextStyle(fontSize: 11, color: AppColors.patrolAccent, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
               ),
             ],
           ],
@@ -446,7 +642,7 @@ class PetugasRondaDashboard extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.qr_code_2, color: Colors.teal, size: 22),
+            const Icon(Icons.qr_code_2, color: AppColors.secondary, size: 22),
             const SizedBox(width: 8),
             const Text(
               'Pos Checkpoint Fisik (Patroli QR)',
@@ -470,24 +666,46 @@ class PetugasRondaDashboard extends StatelessWidget {
           }
 
           final isNear = distance != null && distance <= cp.radiusMeter;
-          final isCheckedIn = ronda.patrolLogs.any((l) => l.checkpointId == cp.id);
+          final status = ronda.getCheckpointStatus(cp);
+
+          Color statusBg;
+          Color statusFg;
+          String statusText;
+
+          switch (status) {
+            case CheckpointScheduleStatus.sebelum:
+              statusBg = Colors.blue.shade50;
+              statusFg = Colors.blue.shade700;
+              statusText = 'Mendatang (${cp.targetWaktuCheckin} WIB)';
+              break;
+            case CheckpointScheduleStatus.saat:
+              statusBg = AppColors.patrolAccentLight;
+              statusFg = AppColors.patrolAccent;
+              statusText = 'WAKTUNYA SCAN!';
+              break;
+            case CheckpointScheduleStatus.terlewat:
+              statusBg = AppColors.emergencyLight;
+              statusFg = AppColors.emergency;
+              statusText = 'TERLEWAT (${cp.targetWaktuCheckin} WIB)';
+              break;
+            case CheckpointScheduleStatus.selesai:
+              statusBg = AppColors.verifiedLight;
+              statusFg = AppColors.verified;
+              statusText = 'Terverifikasi';
+              break;
+          }
 
           return Card(
-            elevation: 1,
             margin: const EdgeInsets.only(bottom: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: isCheckedIn ? Colors.teal.shade300 : Colors.grey.shade200),
-            ),
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: isCheckedIn ? Colors.teal : Colors.grey.shade300,
+                    backgroundColor: status == CheckpointScheduleStatus.selesai ? AppColors.verified : Colors.grey.shade200,
                     child: Icon(
-                      isCheckedIn ? Icons.check : Icons.pin_drop,
-                      color: isCheckedIn ? Colors.white : Colors.black54,
+                      status == CheckpointScheduleStatus.selesai ? Icons.check : Icons.pin_drop,
+                      color: status == CheckpointScheduleStatus.selesai ? Colors.white : Colors.grey.shade700,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -499,21 +717,42 @@ class PetugasRondaDashboard extends StatelessWidget {
                           '${cp.kodeTitik} - ${cp.namaLokasi}',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: statusBg,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                statusText,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: statusFg,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Target: ${cp.targetWaktuCheckin}',
+                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
                         Text(
                           distance != null
                               ? 'Jarak GPS: ${distance.toStringAsFixed(1)}m (Radius: ${cp.radiusMeter.toInt()}m)'
                               : 'Menunggu sinyal GPS...',
                           style: TextStyle(
                             fontSize: 11,
-                            color: isNear ? Colors.green.shade700 : Colors.grey.shade700,
+                            color: isNear ? AppColors.verified : Colors.grey.shade700,
                             fontWeight: isNear ? FontWeight.bold : FontWeight.normal,
                           ),
                         ),
-                        if (isCheckedIn)
-                          const Text(
-                            'Sudah Di-check-in malam ini',
-                            style: TextStyle(fontSize: 10, color: Colors.teal, fontWeight: FontWeight.bold),
-                          ),
                       ],
                     ),
                   ),
@@ -548,14 +787,14 @@ class PetugasRondaDashboard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.qr_code_scanner, color: Colors.teal),
+                const Icon(Icons.qr_code_scanner, color: AppColors.secondary),
                 const SizedBox(width: 8),
                 Text('Pindai QR: ${cp.kodeTitik}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ],
             ),
             const SizedBox(height: 6),
-            Text(cp.namaLokasi, style: const TextStyle(fontSize: 13, color: Colors.black87)),
-            const SizedBox(height: 12),
+            Text(cp.namaLokasi, style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 14),
             const Text(
               'Pilih mode verifikasi check-in:',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -564,6 +803,7 @@ class PetugasRondaDashboard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
                 onPressed: () async {
                   Navigator.pop(ctx);
                   await ronda.checkinCheckpoint(checkpoint: cp, simulateProximity: false);
@@ -605,8 +845,8 @@ class PetugasRondaDashboard extends StatelessWidget {
         Expanded(
           child: OutlinedButton.icon(
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-            onPressed: () => _showShiftSwapDialog(context, ronda),
-            icon: const Icon(Icons.swap_horiz, color: Colors.blue),
+            onPressed: () => _showRichShiftSwapDialog(context, ronda),
+            icon: const Icon(Icons.swap_horiz, color: AppColors.secondary),
             label: const Text('Tukar Jadwal', style: TextStyle(fontSize: 13)),
           ),
         ),
@@ -633,12 +873,12 @@ class PetugasRondaDashboard extends StatelessWidget {
                 onChanged: (val) {
                   if (val != null) setDialogState(() => selectedCat = val);
                 },
-                decoration: const InputDecoration(labelText: 'Kategori Insiden', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'Kategori Insiden'),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: noteController,
-                decoration: const InputDecoration(labelText: 'Keterangan Temuan', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'Keterangan Temuan'),
                 maxLines: 2,
               ),
             ],
@@ -646,6 +886,7 @@ class PetugasRondaDashboard extends StatelessWidget {
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
             FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
               onPressed: () {
                 Navigator.pop(ctx);
                 ronda.reportIncident(
@@ -662,51 +903,159 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  void _showShiftSwapDialog(BuildContext context, RondaProvider ronda) {
-    final noteController = TextEditingController(text: 'Ada keperluan keluarga mendesak.');
-    final schedules = ronda.schedules;
-    final otherOfficers = ronda.availableUsers.where((u) => u.role == UserRole.petugasRonda && u.id != ronda.currentUser!.id).toList();
+  /// Dialog Pengajuan Tukar Jadwal Lengkap (Pilih Rekan, Tanggal, Shift, dan Alasan)
+  void _showRichShiftSwapDialog(BuildContext context, RondaProvider ronda) {
+    final mySchedules = ronda.schedules.where((s) => s.userId == ronda.currentUser!.id && !s.isLibur).toList();
+    final otherOfficers = ronda.allOfficers.where((u) => u.id != ronda.currentUser!.id).toList();
 
-    if (schedules.isEmpty || otherOfficers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tidak ada petugas pengganti yang tersedia.')));
+    if (otherOfficers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tidak ada petugas pengganti lain yang terdaftar.')),
+      );
       return;
     }
 
-    final targetUser = otherOfficers.first;
-    final mySchedule = schedules.first;
+    String selectedScheduleId = mySchedules.isNotEmpty ? mySchedules.first.id : 'SCHED-CUSTOM';
+    String targetOfficerId = otherOfficers.first.id;
+    DateTime targetDate = DateTime.now().add(const Duration(days: 1));
+    String targetShift = 'Shift Malam (22:00 - 04:00)';
+    final noteController = TextEditingController(text: 'Ada keperluan keluarga mendesak.');
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Ajukan Tukar Jadwal Ronda'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Jadwal Anda: ${DateFormat('dd MMMM yyyy').format(mySchedule.tanggalRonda)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 8),
-            Text('Petugas Pengganti: ${targetUser.namaLengkap}', style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: noteController,
-              decoration: const InputDecoration(labelText: 'Alasan Pertukaran', border: OutlineInputBorder()),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.swap_horiz, color: AppColors.secondary),
+                SizedBox(width: 8),
+                Text('Ajukan Tukar Jadwal', style: TextStyle(fontSize: 16)),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ronda.requestShiftSwap(
-                scheduleId: mySchedule.id,
-                targetUserId: targetUser.id,
-                alasan: noteController.text.trim(),
-              );
-            },
-            child: const Text('Kirim Pengajuan'),
-          ),
-        ],
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Jadwal yang ingin ditukar
+                  const Text('Jadwal Saya yang Ingin Ditukar:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  if (mySchedules.isNotEmpty)
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedScheduleId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(isDense: true),
+                      items: mySchedules.map((s) {
+                        return DropdownMenuItem(
+                          value: s.id,
+                          child: Text(
+                            '${DateFormat('dd MMM yyyy').format(s.tanggalRonda)} - ${s.shiftName}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedScheduleId = val);
+                      },
+                    )
+                  else
+                    const Text('Belum ada jadwal dinas mendatang.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 12),
+
+                  // Rekan Petugas Pengganti
+                  const Text('Tukar dengan Rekan Petugas:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    initialValue: targetOfficerId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(isDense: true),
+                    items: otherOfficers.map((o) {
+                      return DropdownMenuItem(
+                        value: o.id,
+                        child: Text(o.namaLengkap, style: const TextStyle(fontSize: 12)),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => targetOfficerId = val);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Tanggal & Shift Pengganti yang Diambil
+                  const Text('Tanggal & Shift Pengganti:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: targetDate,
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(const Duration(days: 60)),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => targetDate = picked);
+                            }
+                          },
+                          icon: const Icon(Icons.calendar_today, size: 14),
+                          label: Text(DateFormat('dd/MM/yy').format(targetDate), style: const TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: targetShift,
+                          isExpanded: true,
+                          decoration: const InputDecoration(isDense: true),
+                          items: const [
+                            DropdownMenuItem(value: 'Shift Malam (22:00 - 04:00)', child: Text('Malam', style: TextStyle(fontSize: 12))),
+                            DropdownMenuItem(value: 'Shift Sore (16:00 - 22:00)', child: Text('Sore', style: TextStyle(fontSize: 12))),
+                            DropdownMenuItem(value: 'Shift Siang (08:00 - 16:00)', child: Text('Siang', style: TextStyle(fontSize: 12))),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setDialogState(() => targetShift = val);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Alasan Pertukaran
+                  TextField(
+                    controller: noteController,
+                    decoration: const InputDecoration(
+                      labelText: 'Alasan Pertukaran',
+                      isDense: true,
+                    ),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  final schedId = mySchedules.isNotEmpty ? selectedScheduleId : 'SCHED-DAY-1-JORDI';
+                  ronda.requestShiftSwap(
+                    scheduleId: schedId,
+                    targetUserId: targetOfficerId,
+                    alasan: noteController.text.trim(),
+                    targetDate: targetDate,
+                    targetShift: targetShift,
+                  );
+                },
+                child: const Text('Kirim Pengajuan'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

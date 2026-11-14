@@ -3,10 +3,12 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../domain/ronda/models/ronda_models.dart';
 import '../../../providers/ronda_provider.dart';
+import 'widgets/patrol_calendar_widget.dart';
 
-/// Dasbor Utama Khusus Warga: Fokus pada Tombol Panik SOS, QR Verifikasi Darurat, dan Roster Keamanan Lingkungan
+/// Dasbor Utama Khusus Warga: Fokus pada Tombol Panik SOS, QR Verifikasi Darurat, dan Kalender Ronda Lingkungan
 class WargaDashboard extends StatefulWidget {
   const WargaDashboard({super.key});
 
@@ -32,6 +34,7 @@ class _WargaDashboardState extends State<WargaDashboard> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
             onPressed: () {
               Navigator.pop(ctx);
               ronda.logout();
@@ -101,8 +104,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
             const SizedBox(height: 16),
           ],
 
-          // 4. Petugas Ronda yang Bertugas Malam Ini
-          _buildTonightPatrolCard(context, ronda),
+          // 4. Kalender & Roster Jadwal Ronda Transparan untuk Warga
+          PatrolCalendarWidget(ronda: ronda, allowAdminManagement: false),
           const SizedBox(height: 16),
 
           // 5. Kontak Darurat Lingkungan RT
@@ -114,20 +117,28 @@ class _WargaDashboardState extends State<WargaDashboard> {
 
   Widget _buildNotification(BuildContext context, String text, {required bool isError}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: isError ? Colors.red.shade50 : Colors.green.shade50,
+        color: isError ? AppColors.emergencyLight : AppColors.verifiedLight,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: isError ? Colors.red.shade200 : Colors.green.shade200),
+        border: Border.all(color: isError ? AppColors.emergency : AppColors.verified),
       ),
       child: Row(
         children: [
-          Icon(isError ? Icons.error_outline : Icons.check_circle_outline, color: isError ? Colors.red : Colors.green, size: 20),
-          const SizedBox(width: 8),
+          Icon(
+            isError ? Icons.error_outline : Icons.check_circle_outline,
+            color: isError ? AppColors.emergency : AppColors.verified,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(color: isError ? Colors.red.shade900 : Colors.green.shade900, fontSize: 12),
+              style: TextStyle(
+                color: isError ? AppColors.emergency : AppColors.verified,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -142,29 +153,27 @@ class _WargaDashboardState extends State<WargaDashboard> {
 
     switch (event.status) {
       case EmergencyStatus.belumDitangani:
-        badgeColor = Colors.red;
+        badgeColor = AppColors.emergency;
         badgeText = 'BELUM DITANGANI (Alarm Berdering di Seluruh RT)';
         break;
       case EmergencyStatus.onGoing:
-        badgeColor = Colors.orange;
-        badgeText = 'SEDANG DIRESPONS (Petugas ${event.respondedByUserName ?? ''} Menuju Rumah Anda)';
+        badgeColor = AppColors.patrolAccent;
+        badgeText = 'SEDANG DIRESPONS (Petugas ${event.respondedByUserName ?? ""} Menuju Rumah Anda)';
         break;
       case EmergencyStatus.menungguVerifikasiRt:
         badgeColor = Colors.purple;
         badgeText = 'PENANGANAN BERFOTO (Menunggu Verifikasi RT)';
         break;
       case EmergencyStatus.selesai:
-        badgeColor = Colors.green;
+        badgeColor = AppColors.verified;
         badgeText = 'SELESAI / TERTANGANI';
         break;
     }
 
     return Card(
-      elevation: 4,
-      color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Colors.red, width: 2),
+        side: const BorderSide(color: AppColors.emergency, width: 2),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -172,12 +181,12 @@ class _WargaDashboardState extends State<WargaDashboard> {
           children: [
             Row(
               children: [
-                const Icon(Icons.crisis_alert, color: Colors.red, size: 26),
+                const Icon(Icons.crisis_alert, color: AppColors.emergency, size: 26),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
                     'ALARM DARURAT ANDA AKTIF',
-                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15),
+                    style: TextStyle(color: AppColors.emergency, fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
                 Text(DateFormat('HH:mm:ss').format(event.triggeredAt), style: const TextStyle(fontSize: 11, color: Colors.grey)),
@@ -188,9 +197,9 @@ class _WargaDashboardState extends State<WargaDashboard> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: badgeColor.withAlpha(25),
+                color: badgeColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: badgeColor.withAlpha(80)),
+                border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
               ),
               child: Text(
                 badgeText,
@@ -217,35 +226,31 @@ class _WargaDashboardState extends State<WargaDashboard> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 8, spreadRadius: 1),
-                ],
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: QrImageView(
                 data: event.verificationQrToken,
                 version: QrVersions.auto,
-                size: 170.0,
+                size: 180,
+                backgroundColor: Colors.white,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              event.verificationQrToken,
-              style: const TextStyle(fontSize: 9, fontFamily: 'monospace', color: Colors.grey),
+              'Token: ${event.verificationQrToken}',
+              style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.grey),
             ),
             const SizedBox(height: 16),
 
-            // Tombol Batalkan Alarm
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                ),
-                onPressed: () => ronda.cancelMyEmergency(event.id),
-                icon: const Icon(Icons.cancel_outlined),
-                label: const Text('Batalkan Alarm (Kondisi Aman / Salah Pencet)'),
+            // Tombol Batalkan Alarm (Jika salah tekan)
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.grey.shade700,
+                side: BorderSide(color: Colors.grey.shade400),
               ),
+              onPressed: () => _confirmCancelEmergency(context, ronda, event),
+              icon: const Icon(Icons.close, size: 16),
+              label: const Text('Batalkan Panggilan Darurat Ini (Salah Tekan)', style: TextStyle(fontSize: 12)),
             ),
           ],
         ),
@@ -253,64 +258,92 @@ class _WargaDashboardState extends State<WargaDashboard> {
     );
   }
 
-  /// Tombol Panik Utama saat dalam Kondisi Aman
+  void _confirmCancelEmergency(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Batalkan Alarm Darurat?'),
+        content: const Text('Apakah Anda yakin situasi telah terkendali dan ingin mematikan alarm SOS?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Kembali')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ronda.cancelMyEmergency(event.id);
+            },
+            child: const Text('Ya, Matikan Alarm'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPanicTriggerCard(BuildContext context, RondaProvider ronda) {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppColors.emergency.withValues(alpha: 0.3)),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             const Text(
-              'Tombol Panik Keamanan (SOS)',
+              'Tombol Panik Darurat (SOS Siskamling)',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             const Text(
-              'Tekan jika Anda melihat bahaya, maling, kebakaran, atau membutuhkan bantuan darurat siskamling malam ini.',
+              'Tekan tombol merah di bawah ini apabila Anda menghadapi bahaya, pencurian, kebakaran, atau kecurigaan di sekitar rumah.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.black54),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
             ),
             const SizedBox(height: 20),
 
-            // Tombol Bulat Besar
-            GestureDetector(
-              onTap: () => _confirmTriggerPanic(context, ronda),
-              child: Container(
-                width: 130,
-                height: 130,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.red.shade700,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.red.withAlpha(100),
-                      blurRadius: 20,
-                      spreadRadius: 4,
-                    ),
-                  ],
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.touch_app, color: Colors.white, size: 36),
-                    SizedBox(height: 4),
-                    Text(
-                      'SOS',
-                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'DARURAT',
-                      style: TextStyle(color: Colors.white70, fontSize: 10, letterSpacing: 1),
-                    ),
-                  ],
+            // Tombol Panik Besar
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(60),
+                onTap: () => _showPanicConfirmationDialog(context, ronda),
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.emergency,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.emergency.withValues(alpha: 0.35),
+                        blurRadius: 16,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.crisis_alert, size: 48, color: Colors.white),
+                      SizedBox(height: 2),
+                      Text(
+                        'SOS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
             const Text(
-              'Sinyal alarm akan memicu sirine di smartphone seluruh petugas ronda dan Ketua RT.',
+              'Alarm akan memicu sirene & notifikasi prioritas tinggi ke pos ronda dan perangkat Ketua RT.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 11, color: Colors.grey),
             ),
@@ -320,14 +353,14 @@ class _WargaDashboardState extends State<WargaDashboard> {
     );
   }
 
-  void _confirmTriggerPanic(BuildContext context, RondaProvider ronda) {
-    _sosNoteController.clear();
+  void _showPanicConfirmationDialog(BuildContext context, RondaProvider ronda) {
+    _sosNoteController.text = 'Melihat orang asing memanjat pagar rumah tetangga!';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.warning, color: Colors.red),
+            Icon(Icons.warning, color: AppColors.emergency),
             SizedBox(width: 8),
             Text('Konfirmasi Alarm SOS'),
           ],
@@ -337,24 +370,24 @@ class _WargaDashboardState extends State<WargaDashboard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Apakah Anda yakin ingin membunyikan alarm darurat siskamling?',
-              style: TextStyle(fontSize: 13),
+              'Apakah Anda yakin ingin menyalakan sirine darurat siskamling?',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _sosNoteController,
               decoration: const InputDecoration(
                 labelText: 'Keterangan Situasi (Opsional)',
-                hintText: 'Misal: Ada suara mencurigakan di atap',
-                border: OutlineInputBorder(),
+                isDense: true,
               ),
+              maxLines: 2,
             ),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.emergency),
             onPressed: () {
               Navigator.pop(ctx);
               ronda.triggerPanic(
@@ -368,58 +401,6 @@ class _WargaDashboardState extends State<WargaDashboard> {
     );
   }
 
-  Widget _buildTonightPatrolCard(BuildContext context, RondaProvider ronda) {
-    final schedules = ronda.schedules;
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade300),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.shield, color: Colors.teal, size: 22),
-                SizedBox(width: 8),
-                Text(
-                  'Petugas Ronda Malam Ini',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (schedules.isEmpty)
-              const Text('Belum ada jadwal patroli aktif.', style: TextStyle(fontSize: 12, color: Colors.grey))
-            else
-              ...schedules.map((s) {
-                return ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: Colors.teal,
-                    radius: 16,
-                    child: Icon(Icons.person, color: Colors.white, size: 16),
-                  ),
-                  title: Text(s.petugasName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  subtitle: Text('Jaga: ${s.jamMulai} - ${s.jamSelesai} WIB', style: const TextStyle(fontSize: 11)),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: Colors.teal.shade50, borderRadius: BorderRadius.circular(8)),
-                    child: const Text('Aktif Patroli', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 10)),
-                  ),
-                );
-              }),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildEmergencyContactsCard(BuildContext context) {
     final contacts = [
       {'name': 'Pos Kamling Utama RT 04', 'phone': '0812-3456-7801', 'role': 'Pos Ronda'},
@@ -429,12 +410,6 @@ class _WargaDashboardState extends State<WargaDashboard> {
     ];
 
     return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade300),
-      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -442,7 +417,7 @@ class _WargaDashboardState extends State<WargaDashboard> {
           children: [
             const Row(
               children: [
-                Icon(Icons.contact_phone, color: Colors.blue, size: 22),
+                Icon(Icons.contact_phone, color: AppColors.secondary, size: 20),
                 SizedBox(width: 8),
                 Text(
                   'Nomor Penting & Darurat',
@@ -456,9 +431,9 @@ class _WargaDashboardState extends State<WargaDashboard> {
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
-                  backgroundColor: Colors.blue.shade100,
+                  backgroundColor: AppColors.secondaryContainer,
                   radius: 16,
-                  child: Icon(Icons.phone, color: Colors.blue.shade900, size: 16),
+                  child: const Icon(Icons.phone, color: AppColors.secondary, size: 16),
                 ),
                 title: Text(c['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 subtitle: Text('${c['phone']} • ${c['role']}', style: const TextStyle(fontSize: 11)),

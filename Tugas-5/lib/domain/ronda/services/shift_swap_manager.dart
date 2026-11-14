@@ -11,6 +11,9 @@ class ShiftSwapManager {
     required RondaUser requester,
     required RondaUser targetUser,
     required String alasan,
+    String? requesterShift,
+    DateTime? targetDate,
+    String? targetShift,
     DateTime? createdAt,
   }) {
     if (requester.id == targetUser.id) {
@@ -33,6 +36,9 @@ class ShiftSwapManager {
       targetUserId: targetUser.id,
       targetUserName: targetUser.namaLengkap,
       alasan: alasan,
+      requesterShift: requesterShift ?? schedule.shiftName,
+      targetDate: targetDate ?? schedule.tanggalRonda,
+      targetShift: targetShift ?? 'Shift Malam',
       status: ShiftSwapStatus.pending,
       createdAt: createdAt ?? DateTime.now(),
     );

@@ -42,7 +42,7 @@ void main() {
 
     // Verifikasi berada di AdminRtDashboard
     expect(find.text('Pusat Komando & Log RT'), findsOneWidget);
-    expect(find.text('Approval Pertukaran Jadwal Ronda'), findsOneWidget);
+    expect(find.textContaining('Petugas Berjaga Hari Ini'), findsOneWidget);
 
     // Logout Ketua RT
     await tester.tap(logoutBtn);
@@ -61,7 +61,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verifikasi berada di WargaDashboard
-    expect(find.text('Tombol Panik Keamanan (SOS)'), findsOneWidget);
-    expect(find.text('Petugas Ronda Malam Ini'), findsOneWidget);
+    expect(find.textContaining('Tombol Panik'), findsOneWidget);
+    expect(find.textContaining('Kalender & Roster Jadwal Ronda'), findsOneWidget);
   });
 }

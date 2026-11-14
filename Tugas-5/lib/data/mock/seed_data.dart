@@ -41,6 +41,17 @@ class SeedData {
     fcmToken: 'fcm_token_petugas_devi',
   );
 
+  static final RondaUser petugasBudi = RondaUser(
+    id: 'user-petugas-03',
+    rtId: rtId,
+    namaLengkap: 'Budi Santoso (Petugas Ronda)',
+    nomorWhatsapp: '081234567806',
+    alamatRumah: 'Jl. Gebang Timur Blok C No. 08',
+    role: UserRole.petugasRonda,
+    passwordHash: RondaUser.hashPassword(defaultDemoPassword),
+    fcmToken: 'fcm_token_petugas_budi',
+  );
+
   static final RondaUser wargaFito = RondaUser(
     id: 'user-warga-01',
     rtId: rtId,
@@ -67,6 +78,7 @@ class SeedData {
         ketuaRt,
         petugasJordi,
         petugasDevi,
+        petugasBudi,
         wargaFito,
         wargaRisqi,
       ];
@@ -82,6 +94,9 @@ class SeedData {
       longitude: 112.795323,
       radiusMeter: 25.0,
       secretKey: 'key_pos_utama_secret_998',
+      targetWaktuCheckin: '22:30',
+      windowMenitSebelum: 20,
+      windowMenitSetelah: 40,
     ),
     const Checkpoint(
       id: 'CP-GARDU-PLN',
@@ -92,6 +107,9 @@ class SeedData {
       longitude: 112.796000,
       radiusMeter: 25.0,
       secretKey: 'key_gardu_pln_secret_887',
+      targetWaktuCheckin: '23:30',
+      windowMenitSebelum: 20,
+      windowMenitSetelah: 40,
     ),
     const Checkpoint(
       id: 'CP-PORTAL-TIMUR',
@@ -102,6 +120,9 @@ class SeedData {
       longitude: 112.795800,
       radiusMeter: 30.0,
       secretKey: 'key_portal_timur_secret_776',
+      targetWaktuCheckin: '01:00',
+      windowMenitSebelum: 20,
+      windowMenitSetelah: 40,
     ),
     const Checkpoint(
       id: 'CP-TAMAN-WARGA',
@@ -112,28 +133,76 @@ class SeedData {
       longitude: 112.794900,
       radiusMeter: 25.0,
       secretKey: 'key_taman_warga_secret_665',
+      targetWaktuCheckin: '02:30',
+      windowMenitSebelum: 20,
+      windowMenitSetelah: 40,
     ),
   ];
 
   // 3. Data Jadwal Ronda Aktif
-  static List<PatrolSchedule> initialSchedules(DateTime baseDate) => [
-        PatrolSchedule(
-          id: 'SCHED-DAY-1-JORDI',
-          rtId: rtId,
-          userId: petugasJordi.id,
-          petugasName: petugasJordi.namaLengkap,
-          tanggalRonda: baseDate,
-          jamMulai: '22:00',
-          jamSelesai: '04:00',
-        ),
-        PatrolSchedule(
-          id: 'SCHED-DAY-2-DEVI',
-          rtId: rtId,
-          userId: petugasDevi.id,
-          petugasName: petugasDevi.namaLengkap,
-          tanggalRonda: baseDate.add(const Duration(days: 1)),
-          jamMulai: '22:00',
-          jamSelesai: '04:00',
-        ),
-      ];
+  static List<PatrolSchedule> initialSchedules(DateTime baseDate) {
+    final today = DateTime(baseDate.year, baseDate.month, baseDate.day);
+    return [
+      PatrolSchedule(
+        id: 'SCHED-DAY-1-JORDI',
+        rtId: rtId,
+        userId: petugasJordi.id,
+        petugasName: petugasJordi.namaLengkap,
+        tanggalRonda: today,
+        shiftName: 'Shift Malam (22:00 - 04:00)',
+        jamMulai: '22:00',
+        jamSelesai: '04:00',
+      ),
+      PatrolSchedule(
+        id: 'SCHED-DAY-1-DEVI-SORE',
+        rtId: rtId,
+        userId: petugasDevi.id,
+        petugasName: petugasDevi.namaLengkap,
+        tanggalRonda: today,
+        shiftName: 'Shift Sore (16:00 - 22:00)',
+        jamMulai: '16:00',
+        jamSelesai: '22:00',
+      ),
+      PatrolSchedule(
+        id: 'SCHED-DAY-2-DEVI',
+        rtId: rtId,
+        userId: petugasDevi.id,
+        petugasName: petugasDevi.namaLengkap,
+        tanggalRonda: today.add(const Duration(days: 1)),
+        shiftName: 'Shift Malam (22:00 - 04:00)',
+        jamMulai: '22:00',
+        jamSelesai: '04:00',
+      ),
+      PatrolSchedule(
+        id: 'SCHED-DAY-2-BUDI-SORE',
+        rtId: rtId,
+        userId: petugasBudi.id,
+        petugasName: petugasBudi.namaLengkap,
+        tanggalRonda: today.add(const Duration(days: 1)),
+        shiftName: 'Shift Sore (16:00 - 22:00)',
+        jamMulai: '16:00',
+        jamSelesai: '22:00',
+      ),
+      PatrolSchedule(
+        id: 'SCHED-DAY-3-BUDI',
+        rtId: rtId,
+        userId: petugasBudi.id,
+        petugasName: petugasBudi.namaLengkap,
+        tanggalRonda: today.add(const Duration(days: 2)),
+        shiftName: 'Shift Malam (22:00 - 04:00)',
+        jamMulai: '22:00',
+        jamSelesai: '04:00',
+      ),
+      PatrolSchedule(
+        id: 'SCHED-DAY-4-JORDI',
+        rtId: rtId,
+        userId: petugasJordi.id,
+        petugasName: petugasJordi.namaLengkap,
+        tanggalRonda: today.add(const Duration(days: 3)),
+        shiftName: 'Shift Malam (22:00 - 04:00)',
+        jamMulai: '22:00',
+        jamSelesai: '04:00',
+      ),
+    ];
+  }
 }

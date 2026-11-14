@@ -5,55 +5,61 @@ class SeedData {
   const SeedData._();
 
   static const String rtId = 'RT-04-RW-02-SUKOLILO';
+  static const String defaultDemoPassword = 'password123';
 
-  // 1. Data Pengguna Berperan (Kelompok 4 Teknik Komputer ITS)
-  static final RondaUser ketuaRt = const RondaUser(
+  // 1. Data Pengguna Berperan Terenkripsi (Kelompok 4 Teknik Komputer ITS)
+  static final RondaUser ketuaRt = RondaUser(
     id: 'user-rt-01',
     rtId: rtId,
     namaLengkap: 'Nicholas Benaya (Ketua RT)',
     nomorWhatsapp: '081234567801',
     alamatRumah: 'Jl. Teknik Komputer No. 01, RT 04',
     role: UserRole.adminRt,
+    passwordHash: RondaUser.hashPassword(defaultDemoPassword),
     fcmToken: 'fcm_token_admin_rt_01',
   );
 
-  static final RondaUser petugasJordi = const RondaUser(
+  static final RondaUser petugasJordi = RondaUser(
     id: 'user-petugas-01',
     rtId: rtId,
-    namaLengkap: 'Jordi',
+    namaLengkap: 'Jordi (Petugas Ronda)',
     nomorWhatsapp: '081234567802',
     alamatRumah: 'Jl. Gebang Putih Blok A No. 10',
     role: UserRole.petugasRonda,
+    passwordHash: RondaUser.hashPassword(defaultDemoPassword),
     fcmToken: 'fcm_token_petugas_jordi',
   );
 
-  static final RondaUser petugasDevi = const RondaUser(
+  static final RondaUser petugasDevi = RondaUser(
     id: 'user-petugas-02',
     rtId: rtId,
     namaLengkap: 'Devi Putri Sekar Arum',
     nomorWhatsapp: '081234567803',
     alamatRumah: 'Jl. Gebang Putih Blok B No. 04',
     role: UserRole.petugasRonda,
+    passwordHash: RondaUser.hashPassword(defaultDemoPassword),
     fcmToken: 'fcm_token_petugas_devi',
   );
 
-  static final RondaUser wargaFito = const RondaUser(
+  static final RondaUser wargaFito = RondaUser(
     id: 'user-warga-01',
     rtId: rtId,
-    namaLengkap: 'Fito Dwi Ardiansah',
+    namaLengkap: 'Fito Dwi Ardiansah (Warga)',
     nomorWhatsapp: '081234567804',
     alamatRumah: 'Jl. Gebang Timur No. 15',
     role: UserRole.warga,
+    passwordHash: RondaUser.hashPassword(defaultDemoPassword),
     fcmToken: 'fcm_token_warga_fito',
   );
 
-  static final RondaUser wargaRisqi = const RondaUser(
+  static final RondaUser wargaRisqi = RondaUser(
     id: 'user-warga-02',
     rtId: rtId,
-    namaLengkap: 'Muhamad Risqi Aditiya',
+    namaLengkap: 'Muhamad Risqi Aditiya (Warga)',
     nomorWhatsapp: '081234567805',
     alamatRumah: 'Jl. Gebang Timur No. 22',
     role: UserRole.warga,
+    passwordHash: RondaUser.hashPassword(defaultDemoPassword),
     fcmToken: 'fcm_token_warga_risqi',
   );
 
@@ -65,7 +71,7 @@ class SeedData {
         wargaRisqi,
       ];
 
-  // 2. Data Titik Checkpoint Patroli Lingkungan (Koordinat Area Kampus ITS / Sukolilo)
+  // 2. Data Titik Checkpoint Pos Patroli Fisik Lingkungan
   static final List<Checkpoint> checkpoints = [
     const Checkpoint(
       id: 'CP-POS-UTAMA',
@@ -81,7 +87,7 @@ class SeedData {
       id: 'CP-GARDU-PLN',
       rtId: rtId,
       kodeTitik: 'POS-02',
-      namaLokasi: 'Gardu PLN & Area Lapangan RW',
+      namaLokasi: 'Gardu PLN & Lapangan Warga',
       latitude: -7.282500,
       longitude: 112.796000,
       radiusMeter: 25.0,
@@ -101,7 +107,7 @@ class SeedData {
       id: 'CP-TAMAN-WARGA',
       rtId: rtId,
       kodeTitik: 'POS-04',
-      namaLokasi: 'Taman & Balai Pertemuan RT',
+      namaLokasi: 'Balai Pertemuan & Pos Ronda Selatan',
       latitude: -7.282800,
       longitude: 112.794900,
       radiusMeter: 25.0,

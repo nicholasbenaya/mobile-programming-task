@@ -12,16 +12,16 @@ import '../domain/ronda/services/qr_token_verifier.dart';
 class RondaProvider extends ChangeNotifier {
   RondaProvider() {
     _backend = MockBackend();
-    _currentUser = SeedData.petugasJordi; // Default peran awal: Petugas Ronda
-    _checkpoints = _backend.getCheckpoints(_currentUser.rtId);
     _offlineQueue = OfflineSyncQueue();
-    refreshData();
+    // Default state awal: Pengguna belum login untuk menjamin keamanan kredensial
+    _currentUser = null;
+    _checkpoints = SeedData.checkpoints;
   }
 
   late final MockBackend _backend;
-  late RondaUser _currentUser;
-  late List<Checkpoint> _checkpoints;
   late final OfflineSyncQueue _offlineQueue;
+  RondaUser? _currentUser;
+  late List<Checkpoint> _checkpoints;
 
   Position? _currentGpsPosition;
   bool _isOfflineMode = false;
@@ -29,8 +29,9 @@ class RondaProvider extends ChangeNotifier {
   String? _lastErrorMessage;
   String? _lastSuccessMessage;
 
-  // Getters
-  RondaUser get currentUser => _currentUser;
+  // Getters Keamanan & Autentikasi
+  bool get isAuthenticated => _currentUser != null;
+  RondaUser? get currentUser => _currentUser;
   List<RondaUser> get availableUsers => SeedData.allUsers;
   List<Checkpoint> get checkpoints => _checkpoints;
   OfflineSyncQueue get offlineQueue => _offlineQueue;
@@ -40,20 +41,73 @@ class RondaProvider extends ChangeNotifier {
   String? get lastErrorMessage => _lastErrorMessage;
   String? get lastSuccessMessage => _lastSuccessMessage;
 
-  List<PatrolSchedule> get schedules => _backend.getSchedules(_currentUser.rtId);
+  List<PatrolSchedule> get schedules =>
+      _currentUser != null ? _backend.getSchedules(_currentUser!.rtId) : [];
   List<PatrolCheckin> get patrolLogs => _backend.patrolLogs;
   List<IncidentReport> get incidents => _backend.incidents;
+  List<ShiftSwapRequest> get shiftSwaps => _backend.shiftSwaps;
   List<EmergencyEvent> get emergencyEvents => _backend.emergencyEvents;
-  EmergencyEvent? get activeEmergency =>
-      _backend.emergencyEvents.where((e) => e.isActive).lastOrNull;
 
-  /// Mengganti peran pengguna secara instan di UI
-  void switchUser(RondaUser user) {
-    _currentUser = user;
+  /// Insiden darurat aktif di lingkungan RT
+  List<EmergencyEvent> get activeEmergencies =>
+      _backend.emergencyEvents.where((e) => e.isActive).toList();
+
+  EmergencyEvent? get latestActiveEmergency =>
+      _backend.emergencyEvents.where((e) => e.isActive).firstOrNull;
+
+  /// Insiden darurat yang dipicu oleh warga yang sedang login saat ini
+  EmergencyEvent? get myActiveEmergency {
+    if (_currentUser == null) return null;
+    return _backend.emergencyEvents
+        .where((e) => e.userId == _currentUser!.id && e.isActive)
+        .firstOrNull;
+  }
+
+  // ==========================================
+  // 1. AUTENTIKASI AMAN & TERENKRIPSI
+  // ==========================================
+
+  /// Login resmi dengan nomor WhatsApp dan kata sandi terenkripsi
+  Future<bool> login({required String whatsapp, required String password}) async {
     _lastErrorMessage = null;
-    _lastSuccessMessage = 'Beralih ke pengguna: ${user.namaLengkap} (${user.role.label})';
+    _lastSuccessMessage = null;
+
+    try {
+      final user = _backend.login(whatsapp: whatsapp, password: password);
+      _currentUser = user;
+      _checkpoints = _backend.getCheckpoints(user.rtId);
+      _lastSuccessMessage = 'Login Berhasil: Selamat datang, ${user.namaLengkap}!';
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _lastErrorMessage = e.toString().replaceAll('StateError: ', '').replaceAll('ArgumentError: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Autologin cepat untuk penguji / evaluator (memasukkan kredensial otomatis)
+  Future<bool> quickLogin(RondaUser user) async {
+    return login(whatsapp: user.nomorWhatsapp, password: SeedData.defaultDemoPassword);
+  }
+
+  /// Keluar dari sesi pengguna
+  void logout() {
+    _currentUser = null;
+    _lastErrorMessage = null;
+    _lastSuccessMessage = 'Sesi telah berakhir. Silakan login kembali.';
     notifyListeners();
   }
+
+  void clearMessages() {
+    _lastErrorMessage = null;
+    _lastSuccessMessage = null;
+    notifyListeners();
+  }
+
+  // ==========================================
+  // 2. CHECK-IN PATROLI FISIK & GPS
+  // ==========================================
 
   /// Toggle simulasi patroli di area blank spot
   void setOfflineMode(bool value) async {
@@ -124,11 +178,12 @@ class RondaProvider extends ChangeNotifier {
     }
   }
 
-  /// Melakukan Check-in pos patroli (dengan opsi simulasi jarak dekat untuk penguji)
+  /// Melakukan Check-in pos patroli dengan verifikasi QR fisik dan Geofence GPS
   Future<bool> checkinCheckpoint({
     required Checkpoint checkpoint,
     bool simulateProximity = false,
   }) async {
+    if (_currentUser == null) return false;
     _lastErrorMessage = null;
     _lastSuccessMessage = null;
 
@@ -137,7 +192,7 @@ class RondaProvider extends ChangeNotifier {
     final double accuracy;
 
     if (simulateProximity) {
-      // Simulasi penguji berada 5 meter di dekat pos
+      // Simulasi petugas berada 5 meter di dekat pos fisik
       lat = checkpoint.latitude + 0.00003;
       lon = checkpoint.longitude + 0.00003;
       accuracy = 4.0;
@@ -150,7 +205,7 @@ class RondaProvider extends ChangeNotifier {
       accuracy = _currentGpsPosition?.accuracy ?? 5.0;
     }
 
-    // 1. Generate QR Payload bertanda waktu
+    // 1. Generate QR Payload bertanda waktu pos fisik
     final qrPayload = QrTokenVerifier.generateQrPayload(
       checkpointId: checkpoint.id,
       secretKey: checkpoint.secretKey,
@@ -179,7 +234,7 @@ class RondaProvider extends ChangeNotifier {
       final offlineItem = PatrolCheckin(
         id: checkinId,
         checkpointId: checkpoint.id,
-        userId: _currentUser.id,
+        userId: _currentUser!.id,
         scannedAt: DateTime.now(),
         latitudeUser: lat,
         longitudeUser: lon,
@@ -188,22 +243,22 @@ class RondaProvider extends ChangeNotifier {
         batteryLevel: 85.0,
       );
       _offlineQueue.enqueue(offlineItem);
-      _lastSuccessMessage = 'Sinyal offline: Check-in ${checkpoint.namaLokasi} disimpan di antrean lokal.';
+      _lastSuccessMessage = 'Blank spot: Check-in ${checkpoint.namaLokasi} disimpan di antrean lokal.';
     } else {
       try {
         _backend.submitCheckin(
           checkinId: checkinId,
           checkpointId: checkpoint.id,
-          userId: _currentUser.id,
+          userId: _currentUser!.id,
           qrPayload: qrPayload,
           userLat: lat,
           userLon: lon,
           accuracy: accuracy,
           batteryLevel: 85.0,
         );
-        _lastSuccessMessage = 'Berhasil! Check-in terverifikasi di ${checkpoint.namaLokasi} (Jarak: ${geofence.distanceMeters.toStringAsFixed(1)}m)';
+        _lastSuccessMessage = 'Berhasil! Check-in terverifikasi di ${checkpoint.namaLokasi} (Jarak GPS: ${geofence.distanceMeters.toStringAsFixed(1)}m)';
       } catch (e) {
-        _lastErrorMessage = e.toString();
+        _lastErrorMessage = e.toString().replaceAll('StateError: ', '');
         notifyListeners();
         return false;
       }
@@ -213,43 +268,150 @@ class RondaProvider extends ChangeNotifier {
     return true;
   }
 
-  /// Memicu Tombol Panik / SOS Darurat
-  EmergencyEvent triggerPanic({String? catatan}) {
+  // ==========================================
+  // 3. SIKLUS INSIDEN DARURAT (SOS LIFECYCLE)
+  // ==========================================
+
+  /// Memicu Tombol Panik / SOS Darurat oleh Warga
+  EmergencyEvent? triggerPanic({String? catatan}) {
+    if (_currentUser == null) return null;
+    _lastErrorMessage = null;
+    _lastSuccessMessage = null;
+
     final lat = _currentGpsPosition?.latitude ?? -7.281970;
     final lon = _currentGpsPosition?.longitude ?? 112.795323;
 
-    final event = _backend.triggerPanic(
-      eventId: 'sos-${DateTime.now().millisecondsSinceEpoch}',
-      userId: _currentUser.id,
-      latitude: lat,
-      longitude: lon,
-      catatan: catatan ?? 'Warga membunyikan alarm darurat siskamling!',
-    );
+    try {
+      final event = _backend.triggerPanic(
+        eventId: 'sos-${DateTime.now().millisecondsSinceEpoch}',
+        userId: _currentUser!.id,
+        latitude: lat,
+        longitude: lon,
+        catatan: catatan ?? 'Warga membunyikan alarm darurat siskamling!',
+      );
 
-    _lastSuccessMessage = 'ALARM DARURAT AKTIF! Sinyal dipancarkan ke seluruh smartphone RT.';
-    notifyListeners();
-    return event;
+      _lastSuccessMessage = 'ALARM DARURAT DIAKTIFKAN! Notifikasi sirine dipancarkan ke seluruh petugas.';
+      notifyListeners();
+      return event;
+    } catch (e) {
+      _lastErrorMessage = e.toString().replaceAll('StateError: ', '');
+      notifyListeners();
+      return null;
+    }
   }
 
-  /// Menyelesaikan status darurat
-  void resolveEmergency(String eventId) {
+  /// Petugas merespons insiden (Status beralih ke: ON-GOING)
+  void respondEmergency(String eventId) {
+    if (_currentUser == null) return;
+    try {
+      _backend.respondEmergency(eventId: eventId, responderId: _currentUser!.id);
+      _lastSuccessMessage = 'Anda telah menyatakan merespons insiden. Segera menuju ke lokasi warga.';
+      notifyListeners();
+    } catch (e) {
+      _lastErrorMessage = e.toString().replaceAll('StateError: ', '');
+      notifyListeners();
+    }
+  }
+
+  /// Petugas menyelesaikan insiden via Scan QR Warga Pelapor (Status beralih ke: SELESAI)
+  bool resolveEmergencyWithQr({
+    required String eventId,
+    required String scannedQrPayload,
+  }) {
+    if (_currentUser == null) return false;
+    _lastErrorMessage = null;
+    try {
+      _backend.resolveEmergencyWithQr(
+        eventId: eventId,
+        scannedQrPayload: scannedQrPayload,
+        responderId: _currentUser!.id,
+      );
+      _lastSuccessMessage = 'Validasi QR Berhasil! Status darurat resmi dinyatakan SELESAI.';
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _lastErrorMessage = e.toString().replaceAll('ArgumentError: ', '').replaceAll('StateError: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Petugas menyelesaikan insiden via Foto Bukti (Status beralih ke: MENUNGGU VERIFIKASI RT)
+  bool resolveEmergencyWithPhoto({
+    required String eventId,
+    required String photoPath,
+    required String notes,
+  }) {
+    if (_currentUser == null) return false;
+    _lastErrorMessage = null;
+    try {
+      _backend.resolveEmergencyWithPhoto(
+        eventId: eventId,
+        photoPath: photoPath,
+        notes: notes,
+        responderId: _currentUser!.id,
+      );
+      _lastSuccessMessage = 'Bukti foto terkirim! Status saat ini: MENUNGGU VERIFIKASI KETUA RT.';
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _lastErrorMessage = e.toString().replaceAll('ArgumentError: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Ketua RT memverifikasi foto bukti penanganan insiden
+  void adminVerifyEmergency({
+    required String eventId,
+    required bool isApproved,
+    String? adminNotes,
+  }) {
+    if (_currentUser == null || _currentUser!.role != UserRole.adminRt) {
+      _lastErrorMessage = 'Hanya Ketua RT yang memiliki akses verifikasi.';
+      notifyListeners();
+      return;
+    }
+    try {
+      _backend.adminVerifyEmergency(
+        eventId: eventId,
+        adminId: _currentUser!.id,
+        isApproved: isApproved,
+        adminNotes: adminNotes,
+      );
+      _lastSuccessMessage = isApproved
+          ? 'Laporan disetujui! Status darurat resmi ditutup (SELESAI).'
+          : 'Laporan ditolak. Status dikembalikan ke ON-GOING untuk investigasi lanjut.';
+      notifyListeners();
+    } catch (e) {
+      _lastErrorMessage = e.toString().replaceAll('StateError: ', '');
+      notifyListeners();
+    }
+  }
+
+  /// Batalkan / selesaikan darurat langsung (misal salah tekan oleh pelapor)
+  void cancelMyEmergency(String eventId) {
     _backend.resolveEmergency(eventId);
-    _lastSuccessMessage = 'Status darurat telah diselesaikan (RESOLVED).';
+    _lastSuccessMessage = 'Alarm darurat telah dibatalkan.';
     notifyListeners();
   }
 
-  /// Membuat laporan kejadian insiden berfoto
+  // ==========================================
+  // 4. LAPORAN TEMUAN INSIDEN BERFOTO
+  // ==========================================
+
   void reportIncident({
     required IncidentCategory category,
     required String keterangan,
     required String photoPath,
   }) {
+    if (_currentUser == null) return;
     final lat = _currentGpsPosition?.latitude ?? -7.281970;
     final lon = _currentGpsPosition?.longitude ?? 112.795323;
 
     _backend.reportIncident(
       incidentId: 'inc-${DateTime.now().millisecondsSinceEpoch}',
-      userId: _currentUser.id,
+      userId: _currentUser!.id,
       category: category,
       keterangan: keterangan,
       photoPath: photoPath,
@@ -260,6 +422,68 @@ class RondaProvider extends ChangeNotifier {
 
     _lastSuccessMessage = 'Laporan insiden berhasil dikirim ke Linimasa Keamanan RT.';
     notifyListeners();
+  }
+
+  // ==========================================
+  // 5. TUKAR JADWAL (SHIFT SWAP)
+  // ==========================================
+
+  void requestShiftSwap({
+    required String scheduleId,
+    required String targetUserId,
+    required String alasan,
+  }) {
+    if (_currentUser == null) return;
+    try {
+      _backend.requestShiftSwap(
+        requestId: 'swp-${DateTime.now().millisecondsSinceEpoch}',
+        scheduleId: scheduleId,
+        requesterId: _currentUser!.id,
+        targetUserId: targetUserId,
+        alasan: alasan,
+      );
+      _lastSuccessMessage = 'Permintaan tukar jadwal terkirim ke petugas pengganti.';
+      notifyListeners();
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      notifyListeners();
+    }
+  }
+
+  void respondShiftSwap({required String requestId, required bool isAccepted}) {
+    if (_currentUser == null) return;
+    try {
+      _backend.respondShiftSwap(
+        requestId: requestId,
+        responderId: _currentUser!.id,
+        isAccepted: isAccepted,
+      );
+      _lastSuccessMessage = isAccepted
+          ? 'Anda menyetujui pertukaran. Menunggu persetujuan akhir dari Ketua RT.'
+          : 'Pertukaran jadwal telah ditolak.';
+      notifyListeners();
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      notifyListeners();
+    }
+  }
+
+  void approveShiftSwap({required String requestId, required bool isApproved}) {
+    if (_currentUser == null || _currentUser!.role != UserRole.adminRt) return;
+    try {
+      _backend.approveShiftSwap(
+        requestId: requestId,
+        approverRole: _currentUser!.role,
+        isApproved: isApproved,
+      );
+      _lastSuccessMessage = isApproved
+          ? 'Perpindahan jadwal resmi disetujui. Jadwal patroli telah diperbarui.'
+          : 'Pengajuan perpindahan jadwal ditolak.';
+      notifyListeners();
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      notifyListeners();
+    }
   }
 
   void refreshData() {

@@ -55,6 +55,15 @@ class HaversineCalculator {
     return earthRadiusMeters * c;
   }
 
+  /// Alias convenience method untuk menghitung jarak meter
+  static double distanceMeters(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) =>
+      calculateDistance(lat1, lon1, lat2, lon2);
+
   /// Memverifikasi apakah koordinat pengguna berada dalam radius checkpoint yang diperbolehkan
   static GeofenceValidationResult verifyGeofence({
     required double userLat,
@@ -83,13 +92,15 @@ class HaversineCalculator {
         distanceMeters: distance,
         allowedRadiusMeters: radiusMeters,
         accuracyMeters: accuracyMeters,
-        rejectionReason: 'Akurasi GPS terlalu rendah (${accuracyMeters.toStringAsFixed(1)}m > max ${maxAcceptableAccuracyMeters}m). Harap tunggu sinyal GPS stabil.',
+        rejectionReason:
+            'Akurasi GPS terlalu rendah (${accuracyMeters.toStringAsFixed(1)}m > batas aman ${maxAcceptableAccuracyMeters}m). Berpindahlah ke tempat terbuka.',
       );
     }
 
-    // 3. Hitung jarak Haversine
+    // 3. Kalkulasi jarak fisik
     final distance = calculateDistance(userLat, userLon, targetLat, targetLon);
 
+    // 4. Validasi batas geofence
     if (distance <= radiusMeters) {
       return GeofenceValidationResult(
         isValid: true,
@@ -98,16 +109,16 @@ class HaversineCalculator {
         accuracyMeters: accuracyMeters,
       );
     } else {
-      final selisih = distance - radiusMeters;
       return GeofenceValidationResult(
         isValid: false,
         distanceMeters: distance,
         allowedRadiusMeters: radiusMeters,
         accuracyMeters: accuracyMeters,
-        rejectionReason: 'Posisi Anda berada di luar radius pos (${selisih.toStringAsFixed(1)}m lebih jauh dari batas ${radiusMeters.toStringAsFixed(1)}m).',
+        rejectionReason:
+            'Petugas berada di luar radius pos patroli (${distance.toStringAsFixed(1)}m > toleransi ${radiusMeters.toStringAsFixed(1)}m). Dekati pos fisik untuk memindai.',
       );
     }
   }
 
-  static double _toRadians(double degree) => degree * (math.pi / 180.0);
+  static double _toRadians(double degrees) => degrees * (math.pi / 180.0);
 }

@@ -1,9 +1,9 @@
 // ignore_for_file: avoid_print
+import 'package:ronda_digital/data/mock/mock_backend.dart';
+import 'package:ronda_digital/data/mock/seed_data.dart';
 import 'package:ronda_digital/domain/ronda/models/ronda_models.dart';
 import 'package:ronda_digital/domain/ronda/services/offline_sync_queue.dart';
 import 'package:ronda_digital/domain/ronda/services/qr_token_verifier.dart';
-import 'mock_backend.dart';
-import 'seed_data.dart';
 
 void main() async {
   print('======================================================================');
@@ -15,31 +15,41 @@ void main() async {
   final offlineQueue = OfflineSyncQueue();
 
   var passCount = 0;
-  var totalSteps = 8;
+  const totalSteps = 9;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 1: Login & Cek Jadwal Petugas Ronda
+  // LANGKAH 1: Autentikasi Pengguna Aman & Terenkripsi SHA-256
   // -------------------------------------------------------------------------
-  print('[LANGKAH 1/8] Autentikasi Pengguna & Penarikan Jadwal Ronda');
-  final petugas = backend.loginByWhatsapp('081234567802');
+  print('[LANGKAH 1/9] Autentikasi Pengguna Terenkripsi SHA-256');
+
+  // Uji coba sandi salah: Harus ditolak
+  var wrongPasswordBlocked = false;
+  try {
+    backend.login(whatsapp: '081234567802', password: 'sandiyangsalah');
+  } catch (e) {
+    wrongPasswordBlocked = true;
+    print('  ✓ Proteksi Sandi: Percobaan login gagal dicegah dengan benar ($e)');
+  }
+
+  // Login resmi dengan kredensial benar
+  final petugas = backend.login(whatsapp: '081234567802', password: SeedData.defaultDemoPassword);
   final schedules = backend.getSchedules(petugas.rtId);
   final mySchedule = schedules.firstWhere((s) => s.userId == petugas.id);
 
-  print('  ✓ Login Berhasil: ${petugas.namaLengkap} (${petugas.role.label})');
+  print('  ✓ Login Terverifikasi: ${petugas.namaLengkap} (${petugas.role.label})');
   print('  ✓ Jadwal Shift: ${mySchedule.jamMulai} - ${mySchedule.jamSelesai} WIB');
-  passCount++;
+  if (wrongPasswordBlocked) passCount++;
 
   // -------------------------------------------------------------------------
   // LANGKAH 2: Check-in Pos 1 (Pos Kamling Utama) - Valid
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 2/8] Check-in Pos 1 (Pos Utama) Berjarak ~10m (VALID)');
+  print('\n[LANGKAH 2/9] Check-in Pos 1 (Pos Utama) Berjarak ~10m (VALID)');
   final cp1 = backend.getCheckpoints(petugas.rtId).firstWhere((c) => c.id == 'CP-POS-UTAMA');
   final qrPos1 = QrTokenVerifier.generateQrPayload(
     checkpointId: cp1.id,
     secretKey: cp1.secretKey,
   );
 
-  // Koordinat petugas berada 10 meter dari Pos 1
   const userLatPos1 = -7.281980;
   const userLonPos1 = 112.795330;
 
@@ -61,7 +71,7 @@ void main() async {
   // -------------------------------------------------------------------------
   // LANGKAH 3: Percobaan Curang Scan Pos 2 dari Pos 1 (TOLAK GEOFENCE)
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 3/8] Uji Anti-Kecurangan: Scan Pos 2 Saat Masih di Pos 1 (~90m)');
+  print('\n[LANGKAH 3/9] Uji Anti-Kecurangan: Scan Pos 2 Saat Masih di Pos 1 (~90m)');
   final cp2 = backend.getCheckpoints(petugas.rtId).firstWhere((c) => c.id == 'CP-GARDU-PLN');
   final qrPos2 = QrTokenVerifier.generateQrPayload(
     checkpointId: cp2.id,
@@ -75,7 +85,7 @@ void main() async {
       checkpointId: cp2.id,
       userId: petugas.id,
       qrPayload: qrPos2,
-      userLat: userLatPos1, // Masih di lokasi Pos 1 (~95m dari Pos 2)
+      userLat: userLatPos1,
       userLon: userLonPos1,
       accuracy: 5.0,
     );
@@ -89,7 +99,7 @@ void main() async {
   // -------------------------------------------------------------------------
   // LANGKAH 4: Petugas Berjalan ke Pos 2 & Check-in Sukses
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 4/8] Petugas Berpindah ke Pos 2 (Gardu PLN) & Scan QR');
+  print('\n[LANGKAH 4/9] Petugas Berpindah ke Pos 2 (Gardu PLN) & Scan QR');
   const userLatPos2 = -7.282510;
   const userLonPos2 = 112.796010;
 
@@ -110,7 +120,7 @@ void main() async {
   // -------------------------------------------------------------------------
   // LANGKAH 5: Pelaporan Temuan Insiden Mencurigakan Berfoto
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 5/8] Pelaporan Insiden Mencurigakan oleh Petugas Patroli');
+  print('\n[LANGKAH 5/9] Pelaporan Insiden Mencurigakan oleh Petugas Patroli');
   final incident = backend.reportIncident(
     incidentId: 'inc-001',
     userId: petugas.id,
@@ -119,7 +129,7 @@ void main() async {
     photoPath: 'evidence/rt-04/inc-001.jpg',
     latitude: userLatPos2,
     longitude: userLonPos2,
-    compass: 45.0, // Mengarah ke Timur Laut
+    compass: 45.0,
   );
 
   print('  ✓ Laporan Insiden Tersimpan: [${incident.category.label}]');
@@ -128,37 +138,78 @@ void main() async {
   passCount++;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 6: Tombol Panik (SOS) oleh Warga & Broadcast FCM
+  // LANGKAH 6: Tombol Panik SOS Warga & Penyelesaian Melalui Scan QR Warga
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 6/8] Aktivasi Tombol Panik SOS Warga & Pancaran FCM Topic');
-  final warga = SeedData.wargaFito;
-  final emergency = backend.triggerPanic(
-    eventId: 'sos-alert-999',
-    userId: warga.id,
+  print('\n[LANGKAH 6/9] Siklus SOS 1: Pemicuan ➔ Respons Petugas ➔ Selesai via QR Warga');
+  final wargaFito = SeedData.wargaFito;
+  final emergency1 = backend.triggerPanic(
+    eventId: 'sos-alert-001',
+    userId: wargaFito.id,
     latitude: -7.282900,
     longitude: 112.795100,
-    catatan: 'Maling mencoba memanjat pagar rumah!',
+    catatan: 'Ada orang mencurigakan mengintip jendela rumah',
   );
 
-  final lastFcm = backend.fcmBroadcastHistory.last;
-  print('  ✓ ALARM AKTIF: ${emergency.userName} (${emergency.userAddress})');
-  print('  ✓ Topic FCM: ${lastFcm.topic}');
-  print('  ✓ Judul Notifikasi: ${lastFcm.title}');
-  print('  ✓ File Audio Sirine: ${lastFcm.sound}');
-  print('  ✓ Prioritas Pengiriman: ${lastFcm.priority.toUpperCase()}');
+  print('  ✓ Status Awal: ${emergency1.status.label} (${emergency1.userName})');
+
+  // Petugas merespons
+  backend.respondEmergency(eventId: emergency1.id, responderId: petugas.id);
+  print('  ✓ Petugas Merespons: ${emergency1.status.label} (Petugas: ${emergency1.respondedByUserName})');
+
+  // Petugas menyelesaikan via scan QR code warga pelapor
+  backend.resolveEmergencyWithQr(
+    eventId: emergency1.id,
+    scannedQrPayload: emergency1.verificationQrToken,
+    responderId: petugas.id,
+  );
+  print('  ✓ Selesai Terverifikasi: ${emergency1.status.label} (Metode: ${emergency1.resolvedVia?.label})');
   passCount++;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 7: Uji Ketahanan Offline-First di Area Blank Spot
+  // LANGKAH 7: Siklus SOS 2: Penyelesaian via Foto Bukti ➔ Verifikasi Ketua RT
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 7/8] Uji Patroli di Blank Spot (Offline-First Queue)');
+  print('\n[LANGKAH 7/9] Siklus SOS 2: Penyelesaian Alternatif Foto ➔ Verifikasi Ketua RT');
+  final wargaRisqi = SeedData.wargaRisqi;
+  final emergency2 = backend.triggerPanic(
+    eventId: 'sos-alert-002',
+    userId: wargaRisqi.id,
+    latitude: -7.282950,
+    longitude: 112.795150,
+    catatan: 'Pagar rumah terbuka, penghuni lansia',
+  );
+
+  backend.respondEmergency(eventId: emergency2.id, responderId: petugas.id);
+
+  // Warga tidak bisa scan QR -> Petugas unggah foto bukti
+  backend.resolveEmergencyWithPhoto(
+    eventId: emergency2.id,
+    photoPath: '/evidence/sos-bukti-002.jpg',
+    notes: 'Kondisi aman, pagar sudah dikunci kembali bersama warga.',
+    responderId: petugas.id,
+  );
+  print('  ✓ Petugas Unggah Foto: ${emergency2.status.label}');
+
+  // Ketua RT login dan memverifikasi laporan berfoto
+  final ketuaRt = SeedData.ketuaRt;
+  backend.adminVerifyEmergency(
+    eventId: emergency2.id,
+    adminId: ketuaRt.id,
+    isApproved: true,
+    adminNotes: 'Laporan dicek dan disetujui.',
+  );
+  print('  ✓ Ketua RT Menyetujui: ${emergency2.status.label} (Verified by: ${ketuaRt.namaLengkap})');
+  passCount++;
+
+  // -------------------------------------------------------------------------
+  // LANGKAH 8: Uji Ketahanan Offline-First di Area Blank Spot
+  // -------------------------------------------------------------------------
+  print('\n[LANGKAH 8/9] Uji Patroli di Blank Spot (Offline-First Queue)');
   final cp3 = backend.getCheckpoints(petugas.rtId).firstWhere((c) => c.id == 'CP-PORTAL-TIMUR');
   final qrPos3 = QrTokenVerifier.generateQrPayload(
     checkpointId: cp3.id,
     secretKey: cp3.secretKey,
   );
 
-  // Perangkat kehilangan sinyal internet (Offline)
   final offlineCheckin = PatrolCheckin(
     id: 'chk-offline-01',
     checkpointId: cp3.id,
@@ -174,8 +225,6 @@ void main() async {
   offlineQueue.enqueue(offlineCheckin);
   print('  ✓ Koneksi Internet Terputus: 1 Scan disimpan di antrean lokal (Pending: ${offlineQueue.pendingCount})');
 
-  // Sinyal kembali normal -> sinkronisasi otomatis
-  print('  * Sinyal seluler terhubung kembali, memproses antrean...');
   final synced = await offlineQueue.processQueue((item) async {
     backend.submitCheckin(
       checkinId: item.id,
@@ -196,13 +245,12 @@ void main() async {
   passCount++;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 8: Siklus Pertukaran Jadwal (Shift Swap Lifecycle)
+  // LANGKAH 9: Siklus Pertukaran Jadwal (Shift Swap Lifecycle)
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 8/8] Pengajuan dan Pengesahan Pertukaran Jadwal Ronda');
+  print('\n[LANGKAH 9/9] Pengajuan dan Pengesahan Pertukaran Jadwal Ronda');
   final petugasDevi = SeedData.petugasDevi;
   final scheduleDevi = backend.getSchedules(petugasDevi.rtId).firstWhere((s) => s.userId == petugasDevi.id);
 
-  // 1. Devi mengajukan tukar ke Jordi
   final swapReq = backend.requestShiftSwap(
     requestId: 'swap-dev-01',
     scheduleId: scheduleDevi.id,
@@ -212,7 +260,6 @@ void main() async {
   );
   print('  ✓ Permintaan dibuat oleh ${petugasDevi.namaLengkap} kepada ${petugas.namaLengkap} (${swapReq.status.name})');
 
-  // 2. Jordi menyetujui
   backend.respondShiftSwap(
     requestId: swapReq.id,
     responderId: petugas.id,
@@ -220,7 +267,6 @@ void main() async {
   );
   print('  ✓ Disetujui oleh calon pengganti (${swapReq.status.name})');
 
-  // 3. Pak RT mengesahkan
   backend.approveShiftSwap(
     requestId: swapReq.id,
     approverRole: UserRole.adminRt,

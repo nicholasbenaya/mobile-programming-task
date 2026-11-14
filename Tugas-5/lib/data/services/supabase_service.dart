@@ -8,6 +8,7 @@ class SupabaseService {
 
   static Future<void> initialize() async {
     if (!Env.isConfigured) return;
+    // ignore: deprecated_member_use
     await Supabase.initialize(url: Env.supabaseUrl, anonKey: Env.supabaseAnonKey);
   }
 

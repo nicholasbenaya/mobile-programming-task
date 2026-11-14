@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:latlong2/latlong.dart';
 
 /// Peran Pengguna pada Ekosistem Ronda Digital (RBAC)
@@ -29,6 +31,77 @@ enum UserRole {
       case 'WARGA':
       default:
         return UserRole.warga;
+    }
+  }
+}
+
+/// Siklus Status Insiden Darurat (SOS Lifecycle)
+enum EmergencyStatus {
+  belumDitangani,
+  onGoing,
+  menungguVerifikasiRt,
+  selesai;
+
+  String get label {
+    switch (this) {
+      case EmergencyStatus.belumDitangani:
+        return 'Belum Ditangani (Menunggu Respons)';
+      case EmergencyStatus.onGoing:
+        return 'Sedang Direspons Petugas';
+      case EmergencyStatus.menungguVerifikasiRt:
+        return 'Menunggu Verifikasi RT (Bukti Foto)';
+      case EmergencyStatus.selesai:
+        return 'Selesai / Tertangani';
+    }
+  }
+
+  static EmergencyStatus fromString(String value) {
+    switch (value.toUpperCase()) {
+      case 'BELUM_DITANGANI':
+      case 'BELUMDITANGANI':
+      case 'ACTIVE':
+        return EmergencyStatus.belumDitangani;
+      case 'ON_GOING':
+      case 'ONGOING':
+        return EmergencyStatus.onGoing;
+      case 'MENUNGGU_VERIFIKASI_RT':
+      case 'MENUNGGUVERIFIKASIRT':
+      case 'WAITING_RT':
+        return EmergencyStatus.menungguVerifikasiRt;
+      case 'SELESAI':
+      case 'DONE':
+      case 'RESOLVED':
+      default:
+        return EmergencyStatus.selesai;
+    }
+  }
+}
+
+/// Metode Penyelesaian Insiden Darurat
+enum EmergencyResolutionType {
+  qrWarga,
+  fotoBukti;
+
+  String get label {
+    switch (this) {
+      case EmergencyResolutionType.qrWarga:
+        return 'Scan QR Warga Pelapor (Otomatis Selesai)';
+      case EmergencyResolutionType.fotoBukti:
+        return 'Foto Bukti Lapangan (Perlu Verifikasi RT)';
+    }
+  }
+
+  static EmergencyResolutionType? fromString(String? value) {
+    if (value == null) return null;
+    switch (value.toUpperCase()) {
+      case 'QR_WARGA':
+      case 'QRWARGA':
+        return EmergencyResolutionType.qrWarga;
+      case 'FOTO_BUKTI':
+      case 'FOTOBUKTI':
+        return EmergencyResolutionType.fotoBukti;
+      default:
+        return null;
     }
   }
 }
@@ -89,7 +162,7 @@ enum SyncStatus {
   failed;
 }
 
-/// Entitas Pengguna
+/// Entitas Pengguna Terenkripsi (RBAC)
 class RondaUser {
   const RondaUser({
     required this.id,
@@ -99,6 +172,8 @@ class RondaUser {
     required this.alamatRumah,
     required this.role,
     this.fcmToken,
+    this.passwordHash = '',
+    this.salt = 'ronda_salt_its_kelompok_4',
   });
 
   final String id;
@@ -108,6 +183,21 @@ class RondaUser {
   final String alamatRumah;
   final UserRole role;
   final String? fcmToken;
+  final String passwordHash;
+  final String salt;
+
+  /// Algoritma Hashing SHA-256 Ber-Salt untuk Keamanan Kredensial
+  static String hashPassword(String password, [String salt = 'ronda_salt_its_kelompok_4']) {
+    final bytes = utf8.encode(password + salt);
+    return sha256.convert(bytes).toString();
+  }
+
+  /// Verifikasi kecocokan sandi pengguna
+  bool verifyPassword(String inputPassword) {
+    if (passwordHash.isEmpty) return true; // Fallback jika belum di-hash
+    final computed = hashPassword(inputPassword, salt);
+    return computed == passwordHash;
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -117,6 +207,8 @@ class RondaUser {
         'alamat_rumah': alamatRumah,
         'role': role.name,
         'fcm_token': fcmToken,
+        'password_hash': passwordHash,
+        'salt': salt,
       };
 
   factory RondaUser.fromJson(Map<String, dynamic> json) => RondaUser(
@@ -127,10 +219,12 @@ class RondaUser {
         alamatRumah: json['alamat_rumah'] as String,
         role: UserRole.fromString(json['role'] as String),
         fcmToken: json['fcm_token'] as String?,
+        passwordHash: json['password_hash'] as String? ?? '',
+        salt: json['salt'] as String? ?? 'ronda_salt_its_kelompok_4',
       );
 }
 
-/// Entitas Titik Checkpoint Pos Patroli
+/// Entitas Titik Checkpoint Pos Patroli Fisik
 class Checkpoint {
   const Checkpoint({
     required this.id,
@@ -330,7 +424,7 @@ class ShiftSwapRequest {
       );
 }
 
-/// Entitas Notifikasi & Kejadian Darurat (SOS)
+/// Entitas Notifikasi & Kejadian Darurat (SOS) dengan Siklus Multi-Status
 class EmergencyEvent {
   EmergencyEvent({
     required this.id,
@@ -341,10 +435,19 @@ class EmergencyEvent {
     required this.latitude,
     required this.longitude,
     this.catatan,
-    this.status = 'ACTIVE',
+    this.status = EmergencyStatus.belumDitangani,
     required this.triggeredAt,
+    this.respondedAt,
+    this.respondedByUserId,
+    this.respondedByUserName,
     this.resolvedAt,
-  });
+    this.resolvedVia,
+    this.resolutionPhotoPath,
+    this.resolutionNotes,
+    String? verificationQrToken,
+    this.verifiedByAdminId,
+    this.adminNotes,
+  }) : verificationQrToken = verificationQrToken ?? 'QR-SOS-VERIFY-$id-$userId';
 
   final String id;
   final String rtId;
@@ -354,11 +457,24 @@ class EmergencyEvent {
   final double latitude;
   final double longitude;
   final String? catatan;
-  String status;
+  EmergencyStatus status;
   final DateTime triggeredAt;
+  DateTime? respondedAt;
+  String? respondedByUserId;
+  String? respondedByUserName;
   DateTime? resolvedAt;
+  EmergencyResolutionType? resolvedVia;
+  String? resolutionPhotoPath;
+  String? resolutionNotes;
+  final String verificationQrToken;
+  String? verifiedByAdminId;
+  String? adminNotes;
 
-  bool get isActive => status == 'ACTIVE';
+  bool get isActive => status != EmergencyStatus.selesai;
+  bool get isBelumDitangani => status == EmergencyStatus.belumDitangani;
+  bool get isOnGoing => status == EmergencyStatus.onGoing;
+  bool get isMenungguVerifikasiRt => status == EmergencyStatus.menungguVerifikasiRt;
+  bool get isSelesai => status == EmergencyStatus.selesai;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -369,9 +485,18 @@ class EmergencyEvent {
         'latitude': latitude,
         'longitude': longitude,
         'catatan': catatan,
-        'status': status,
+        'status': status.name,
         'triggered_at': triggeredAt.toIso8601String(),
+        'responded_at': respondedAt?.toIso8601String(),
+        'responded_by_user_id': respondedByUserId,
+        'responded_by_user_name': respondedByUserName,
         'resolved_at': resolvedAt?.toIso8601String(),
+        'resolved_via': resolvedVia?.name,
+        'resolution_photo_path': resolutionPhotoPath,
+        'resolution_notes': resolutionNotes,
+        'verification_qr_token': verificationQrToken,
+        'verified_by_admin_id': verifiedByAdminId,
+        'admin_notes': adminNotes,
       };
 
   factory EmergencyEvent.fromJson(Map<String, dynamic> json) => EmergencyEvent(
@@ -383,9 +508,18 @@ class EmergencyEvent {
         latitude: (json['latitude'] as num).toDouble(),
         longitude: (json['longitude'] as num).toDouble(),
         catatan: json['catatan'] as String?,
-        status: json['status'] as String? ?? 'ACTIVE',
+        status: EmergencyStatus.fromString(json['status'] as String? ?? 'BELUM_DITANGANI'),
         triggeredAt: DateTime.parse(json['triggered_at'] as String),
+        respondedAt: json['responded_at'] != null ? DateTime.parse(json['responded_at'] as String) : null,
+        respondedByUserId: json['responded_by_user_id'] as String?,
+        respondedByUserName: json['responded_by_user_name'] as String?,
         resolvedAt: json['resolved_at'] != null ? DateTime.parse(json['resolved_at'] as String) : null,
+        resolvedVia: EmergencyResolutionType.fromString(json['resolved_via'] as String?),
+        resolutionPhotoPath: json['resolution_photo_path'] as String?,
+        resolutionNotes: json['resolution_notes'] as String?,
+        verificationQrToken: json['verification_qr_token'] as String?,
+        verifiedByAdminId: json['verified_by_admin_id'] as String?,
+        adminNotes: json['admin_notes'] as String?,
       );
 }
 

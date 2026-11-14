@@ -24,13 +24,23 @@ class MockBackend {
   final SosEventDispatcher _sosDispatcher = SosEventDispatcher(debounceWindowSeconds: 15);
   final List<FcmEmergencyPayload> fcmBroadcastHistory = [];
 
-  // 1. Auth Endpoint: POST /api/auth/login
-  RondaUser loginByWhatsapp(String whatsapp) {
+  // 1. Auth Endpoint: POST /api/auth/login (Terenkripsi SHA-256)
+  RondaUser login({required String whatsapp, required String password}) {
+    final cleanPhone = whatsapp.trim().replaceAll(' ', '').replaceAll('-', '');
     final user = _users.firstWhere(
-      (u) => u.nomorWhatsapp == whatsapp,
-      orElse: () => throw StateError('Pengguna dengan nomor $whatsapp tidak ditemukan.'),
+      (u) => u.nomorWhatsapp.replaceAll(' ', '').replaceAll('-', '') == cleanPhone,
+      orElse: () => throw StateError('Nomor WhatsApp $whatsapp tidak terdaftar di sistem siskamling RT.'),
     );
+
+    if (!user.verifyPassword(password)) {
+      throw StateError('Kata sandi yang Anda masukkan salah. Silakan coba lagi.');
+    }
+
     return user;
+  }
+
+  RondaUser loginByWhatsapp(String whatsapp) {
+    return login(whatsapp: whatsapp, password: SeedData.defaultDemoPassword);
   }
 
   // 2. Checkpoints Endpoint: GET /api/checkpoints
@@ -96,7 +106,7 @@ class MockBackend {
       syncStatus: SyncStatus.synced,
     );
 
-    _patrolLogs.add(checkin);
+    _patrolLogs.insert(0, checkin);
     return checkin;
   }
 
@@ -123,7 +133,7 @@ class MockBackend {
       alasan: alasan,
     );
 
-    _shiftSwaps.add(request);
+    _shiftSwaps.insert(0, request);
     return request;
   }
 
@@ -156,7 +166,9 @@ class MockBackend {
     );
   }
 
-  // 5. Emergency SOS Endpoint: POST /api/emergency/panic
+  List<ShiftSwapRequest> get shiftSwaps => List.unmodifiable(_shiftSwaps);
+
+  // 5. Emergency SOS Endpoints (Multi-Stage Lifecycle)
   EmergencyEvent triggerPanic({
     required String eventId,
     required String userId,
@@ -175,9 +187,61 @@ class MockBackend {
       timestamp: timestamp,
     );
 
-    _emergencyEvents.add(result.event);
+    _emergencyEvents.insert(0, result.event);
     fcmBroadcastHistory.add(result.fcmPayload);
     return result.event;
+  }
+
+  void respondEmergency({required String eventId, required String responderId}) {
+    final event = _emergencyEvents.firstWhere((e) => e.id == eventId);
+    final responder = _users.firstWhere((u) => u.id == responderId);
+    _sosDispatcher.respondEmergency(event, responder: responder);
+  }
+
+  void resolveEmergencyWithQr({
+    required String eventId,
+    required String scannedQrPayload,
+    required String responderId,
+  }) {
+    final event = _emergencyEvents.firstWhere((e) => e.id == eventId);
+    final responder = _users.firstWhere((u) => u.id == responderId);
+    _sosDispatcher.resolveEmergencyWithQr(
+      event,
+      scannedQrPayload: scannedQrPayload,
+      responder: responder,
+    );
+  }
+
+  void resolveEmergencyWithPhoto({
+    required String eventId,
+    required String photoPath,
+    required String notes,
+    required String responderId,
+  }) {
+    final event = _emergencyEvents.firstWhere((e) => e.id == eventId);
+    final responder = _users.firstWhere((u) => u.id == responderId);
+    _sosDispatcher.resolveEmergencyWithPhoto(
+      event,
+      photoPath: photoPath,
+      notes: notes,
+      responder: responder,
+    );
+  }
+
+  void adminVerifyEmergency({
+    required String eventId,
+    required String adminId,
+    required bool isApproved,
+    String? adminNotes,
+  }) {
+    final event = _emergencyEvents.firstWhere((e) => e.id == eventId);
+    final admin = _users.firstWhere((u) => u.id == adminId);
+    _sosDispatcher.adminVerifyEmergency(
+      event,
+      admin: admin,
+      isApproved: isApproved,
+      adminNotes: adminNotes,
+    );
   }
 
   void resolveEmergency(String eventId) {
@@ -211,7 +275,7 @@ class MockBackend {
       createdAt: DateTime.now(),
     );
 
-    _incidents.add(report);
+    _incidents.insert(0, report);
     return report;
   }
 

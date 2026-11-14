@@ -1,0 +1,73 @@
+# =====================================================================
+# SensorLog (Flutter + Supabase) .gitignore
+# =====================================================================
+
+# ---- Kunci / konfigurasi lokal (JANGAN di-commit) ----
+lib/core/config/secrets.dart
+.env
+.env.*
+*.keystore
+*.jks
+key.properties
+android/key.properties
+
+# ---- Flutter / Dart ----
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+pubspec.lock
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+.fvm/
+flutter_*.png
+*.log
+*.class
+*.pyc
+.DS_Store
+Thumbs.db
+
+# ---- Android ----
+android/.gradle/
+android/captures/
+android/local.properties
+android/gradle-wrapper.jar
+android/app/debug/
+android/app/profile/
+android/app/release/
+**/android/**/GeneratedPluginRegistrant.java
+
+# ---- iOS / macOS ----
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Flutter/flutter_export_environment.sh
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Pods/
+ios/.symlinks/
+ios/**/xcuserdata/
+ios/**/*.xcworkspace/xcuserdata/
+macos/Flutter/ephemeral/
+macos/Pods/
+**/DerivedData/
+
+# ---- Web / desktop ----
+web/.dart_tool/
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+
+# ---- IDE ----
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# ---- Supabase CLI (jika dipakai) ----
+supabase/.branches/
+supabase/.temp/

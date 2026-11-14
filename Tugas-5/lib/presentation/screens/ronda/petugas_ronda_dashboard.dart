@@ -519,6 +519,11 @@ class PetugasRondaDashboard extends StatelessWidget {
                   ),
                   // Tombol Scan QR
                   FilledButton.tonal(
+                    style: FilledButton.styleFrom(
+                      minimumSize: Size.zero,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     onPressed: () => _handleCheckpointScan(context, ronda, cp),
                     child: const Text('Scan QR', style: TextStyle(fontSize: 12)),
                   ),

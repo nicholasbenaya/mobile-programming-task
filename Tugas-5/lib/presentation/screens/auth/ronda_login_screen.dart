@@ -226,9 +226,11 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                               children: [
                                 Icon(Icons.badge_outlined, size: 20, color: theme.colorScheme.primary),
                                 const SizedBox(width: 8),
-                                const Text(
-                                  'Pilihan Akun Demo (Klik untuk Autofill)',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                const Expanded(
+                                  child: Text(
+                                    'Pilihan Akun Demo (Klik untuk Autofill)',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
                                 ),
                               ],
                             ),

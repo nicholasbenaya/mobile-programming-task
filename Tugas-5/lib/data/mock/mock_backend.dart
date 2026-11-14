@@ -578,4 +578,70 @@ class MockBackend {
   List<EmergencyEvent> get emergencyEvents => List.unmodifiable(_emergencyEvents);
   List<EmergencyEvent> get resolvedEmergencies =>
       _emergencyEvents.where((e) => e.status == EmergencyStatus.selesai).toList();
+
+  void syncEmergencies(List<EmergencyEvent> items) {
+    if (items.isEmpty) return;
+    final map = {for (final e in _emergencyEvents) e.id: e};
+    for (final item in items) {
+      map[item.id] = item;
+    }
+    _emergencyEvents.clear();
+    _emergencyEvents.addAll(map.values);
+    _emergencyEvents.sort((a, b) => b.triggeredAt.compareTo(a.triggeredAt));
+  }
+
+  void syncPatrolLogs(List<PatrolCheckin> items) {
+    if (items.isEmpty) return;
+    final map = {for (final l in _patrolLogs) l.id: l};
+    for (final item in items) {
+      map[item.id] = item;
+    }
+    _patrolLogs.clear();
+    _patrolLogs.addAll(map.values);
+    _patrolLogs.sort((a, b) => b.scannedAt.compareTo(a.scannedAt));
+  }
+
+  void syncSchedules(List<PatrolSchedule> items) {
+    if (items.isEmpty) return;
+    final map = {for (final s in _schedules) s.id: s};
+    for (final item in items) {
+      map[item.id] = item;
+    }
+    _schedules.clear();
+    _schedules.addAll(map.values);
+    _schedules.sort((a, b) => a.tanggalRonda.compareTo(b.tanggalRonda));
+  }
+
+  void syncShiftSwaps(List<ShiftSwapRequest> items) {
+    if (items.isEmpty) return;
+    final map = {for (final s in _shiftSwaps) s.id: s};
+    for (final item in items) {
+      map[item.id] = item;
+    }
+    _shiftSwaps.clear();
+    _shiftSwaps.addAll(map.values);
+    _shiftSwaps.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  void syncNotifications(List<RondaNotification> items) {
+    if (items.isEmpty) return;
+    final map = {for (final n in _notifications) n.id: n};
+    for (final item in items) {
+      map[item.id] = item;
+    }
+    _notifications.clear();
+    _notifications.addAll(map.values);
+    _notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  void syncIncidents(List<IncidentReport> items) {
+    if (items.isEmpty) return;
+    final map = {for (final i in _incidents) i.id: i};
+    for (final item in items) {
+      map[item.id] = item;
+    }
+    _incidents.clear();
+    _incidents.addAll(map.values);
+    _incidents.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
 }

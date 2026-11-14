@@ -1,17 +1,22 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../data/mock/mock_backend.dart';
 import '../data/mock/seed_data.dart';
+import '../data/services/supabase_ronda_service.dart';
 import '../domain/ronda/models/ronda_models.dart';
 import '../domain/ronda/services/haversine_calculator.dart';
 import '../domain/ronda/services/offline_sync_queue.dart';
 import '../domain/ronda/services/qr_token_verifier.dart';
 
 /// Provider Utama untuk Mengelola State Interaktif Ronda Digital di UI
+/// Terkoneksi secara otomatis ke Cloud Supabase dengan Realtime Streaming
+/// dan Fallback Aman ke Mock Backend jika Offline / Blank Spot.
 class RondaProvider extends ChangeNotifier {
-  RondaProvider() {
-    _backend = MockBackend();
+  RondaProvider({SupabaseRondaService? supabaseService, MockBackend? backend}) {
+    _backend = backend ?? MockBackend();
+    _supabase = supabaseService ?? SupabaseRondaService();
     _offlineQueue = OfflineSyncQueue();
     // Default state awal: Pengguna belum login untuk menjamin keamanan kredensial
     _currentUser = null;
@@ -19,9 +24,17 @@ class RondaProvider extends ChangeNotifier {
   }
 
   late final MockBackend _backend;
+  late final SupabaseRondaService _supabase;
   late final OfflineSyncQueue _offlineQueue;
   RondaUser? _currentUser;
   late List<Checkpoint> _checkpoints;
+  final List<RondaUser> _cloudUsers = [];
+
+  StreamSubscription<List<EmergencyEvent>>? _emergencySub;
+  StreamSubscription<List<PatrolCheckin>>? _checkinSub;
+  StreamSubscription<List<ShiftSwapRequest>>? _swapSub;
+  StreamSubscription<List<PatrolSchedule>>? _scheduleSub;
+  StreamSubscription<List<RondaNotification>>? _notifSub;
 
   Position? _currentGpsPosition;
   bool _isOfflineMode = false;
@@ -33,7 +46,9 @@ class RondaProvider extends ChangeNotifier {
   // Getters Keamanan & Autentikasi
   bool get isAuthenticated => _currentUser != null;
   RondaUser? get currentUser => _currentUser;
-  List<RondaUser> get availableUsers => SeedData.allUsers;
+  bool get isCloudConnected => _supabase.isAvailable;
+  List<RondaUser> get availableUsers =>
+      _cloudUsers.isNotEmpty ? _cloudUsers : SeedData.allUsers;
   List<Checkpoint> get checkpoints => _checkpoints;
   OfflineSyncQueue get offlineQueue => _offlineQueue;
   Position? get currentGpsPosition => _currentGpsPosition;
@@ -77,7 +92,7 @@ class RondaProvider extends ChangeNotifier {
 
   /// Daftar petugas ronda yang terdaftar di RT
   List<RondaUser> get allOfficers =>
-      SeedData.allUsers.where((u) => u.role == UserRole.petugasRonda).toList();
+      availableUsers.where((u) => u.role == UserRole.petugasRonda).toList();
 
   /// Daftar petugas yang terjadwal piket ronda hari ini (tidak libur)
   List<RondaUser> get onDutyOfficersToday {
@@ -88,7 +103,7 @@ class RondaProvider extends ChangeNotifier {
         s.tanggalRonda.month == now.month &&
         s.tanggalRonda.day == now.day);
     final userIds = todaySchedules.map((s) => s.userId).toSet();
-    return SeedData.allUsers.where((u) => userIds.contains(u.id)).toList();
+    return availableUsers.where((u) => userIds.contains(u.id)).toList();
   }
 
   /// Cek apakah pengguna saat ini sedang aktif bertugas / berpatroli
@@ -193,6 +208,112 @@ class RondaProvider extends ChangeNotifier {
   }
 
   // ==========================================
+  // REAL-TIME SUPABASE SYNCHRONIZATION
+  // ==========================================
+
+  void _cancelSubscriptions() {
+    _emergencySub?.cancel();
+    _emergencySub = null;
+    _checkinSub?.cancel();
+    _checkinSub = null;
+    _swapSub?.cancel();
+    _swapSub = null;
+    _scheduleSub?.cancel();
+    _scheduleSub = null;
+    _notifSub?.cancel();
+    _notifSub = null;
+  }
+
+  Future<void> _initSupabaseRealtime(String rtId) async {
+    if (!_supabase.isAvailable) return;
+    _cancelSubscriptions();
+
+    try {
+      // 1. Sinkronisasi Data Awal dari Supabase Cloud
+      final cloudUsers = await _supabase.fetchUsers(rtId);
+      if (cloudUsers.isNotEmpty) {
+        _cloudUsers.clear();
+        _cloudUsers.addAll(cloudUsers);
+      }
+
+      final cloudCheckpoints = await _supabase.fetchCheckpoints(rtId);
+      if (cloudCheckpoints.isNotEmpty) {
+        _checkpoints = cloudCheckpoints;
+      }
+
+      final cloudEmergencies = await _supabase.fetchEmergencyEvents(rtId);
+      if (cloudEmergencies.isNotEmpty) {
+        _backend.syncEmergencies(cloudEmergencies);
+      }
+
+      final cloudCheckins = await _supabase.fetchPatrolLogs();
+      if (cloudCheckins.isNotEmpty) {
+        _backend.syncPatrolLogs(cloudCheckins);
+      }
+
+      final cloudSchedules = await _supabase.fetchSchedules(rtId);
+      if (cloudSchedules.isNotEmpty) {
+        _backend.syncSchedules(cloudSchedules);
+      }
+
+      final cloudSwaps = await _supabase.fetchShiftSwaps();
+      if (cloudSwaps.isNotEmpty) {
+        _backend.syncShiftSwaps(cloudSwaps);
+      }
+
+      final cloudNotifs = await _supabase.fetchNotifications(rtId);
+      if (cloudNotifs.isNotEmpty) {
+        _backend.syncNotifications(cloudNotifs);
+      }
+
+      final cloudIncidents = await _supabase.fetchIncidents(rtId);
+      if (cloudIncidents.isNotEmpty) {
+        _backend.syncIncidents(cloudIncidents);
+      }
+
+      notifyListeners();
+
+      // 2. Berlangganan Real-Time Stream (Postgres Changes)
+      _emergencySub = _supabase.streamEmergencies(rtId).listen((items) {
+        if (items.isNotEmpty) {
+          _backend.syncEmergencies(items);
+          notifyListeners();
+        }
+      }, onError: (e) => debugPrint('Realtime Emergency Error: $e'));
+
+      _checkinSub = _supabase.streamCheckins().listen((items) {
+        if (items.isNotEmpty) {
+          _backend.syncPatrolLogs(items);
+          notifyListeners();
+        }
+      }, onError: (e) => debugPrint('Realtime Checkin Error: $e'));
+
+      _swapSub = _supabase.streamShiftSwaps().listen((items) {
+        if (items.isNotEmpty) {
+          _backend.syncShiftSwaps(items);
+          notifyListeners();
+        }
+      }, onError: (e) => debugPrint('Realtime Swap Error: $e'));
+
+      _scheduleSub = _supabase.streamSchedules(rtId).listen((items) {
+        if (items.isNotEmpty) {
+          _backend.syncSchedules(items);
+          notifyListeners();
+        }
+      }, onError: (e) => debugPrint('Realtime Schedule Error: $e'));
+
+      _notifSub = _supabase.streamNotifications(rtId).listen((items) {
+        if (items.isNotEmpty) {
+          _backend.syncNotifications(items);
+          notifyListeners();
+        }
+      }, onError: (e) => debugPrint('Realtime Notif Error: $e'));
+    } catch (e) {
+      debugPrint('Supabase initial sync warning: $e');
+    }
+  }
+
+  // ==========================================
   // 1. AUTENTIKASI AMAN & TERENKRIPSI
   // ==========================================
 
@@ -207,6 +328,9 @@ class RondaProvider extends ChangeNotifier {
       _checkpoints = _backend.getCheckpoints(user.rtId);
       _lastSuccessMessage = 'Login Berhasil: Selamat datang, ${user.namaLengkap}!';
       notifyListeners();
+
+      // Inisialisasi Realtime & Sinkronisasi Cloud jika Supabase terhubung
+      unawaited(_initSupabaseRealtime(user.rtId));
       return true;
     } catch (e) {
       _lastErrorMessage = e.toString().replaceAll('StateError: ', '').replaceAll('ArgumentError: ', '');
@@ -222,6 +346,7 @@ class RondaProvider extends ChangeNotifier {
 
   /// Keluar dari sesi pengguna
   void logout() {
+    _cancelSubscriptions();
     _currentUser = null;
     _lastErrorMessage = null;
     _lastSuccessMessage = 'Sesi telah berakhir. Silakan login kembali.';
@@ -250,7 +375,7 @@ class RondaProvider extends ChangeNotifier {
           secretKey: cp.secretKey,
           timestamp: item.scannedAt,
         );
-        _backend.submitCheckin(
+        final checkin = _backend.submitCheckin(
           checkinId: item.id,
           checkpointId: item.checkpointId,
           userId: item.userId,
@@ -262,9 +387,13 @@ class RondaProvider extends ChangeNotifier {
           scanTime: item.scannedAt,
           forceDutyOverride: true,
         );
+
+        if (_supabase.isAvailable) {
+          unawaited(_supabase.insertCheckin(checkin));
+        }
         return true;
       });
-      _lastSuccessMessage = 'Koneksi Pulih! $count rekaman offline berhasil disinkronkan ke server.';
+      _lastSuccessMessage = 'Koneksi Pulih! $count rekaman offline berhasil disinkronkan ke server & cloud.';
     }
     notifyListeners();
   }
@@ -359,7 +488,7 @@ class RondaProvider extends ChangeNotifier {
 
     final checkinId = 'chk-${DateTime.now().millisecondsSinceEpoch}';
 
-    // 3. Simpan ke Offline Queue atau Langsung ke Backend
+    // 3. Simpan ke Offline Queue atau Langsung ke Backend & Cloud
     if (_isOfflineMode) {
       final offlineItem = PatrolCheckin(
         id: checkinId,
@@ -376,7 +505,7 @@ class RondaProvider extends ChangeNotifier {
       _lastSuccessMessage = 'Blank spot: Check-in ${checkpoint.namaLokasi} disimpan di antrean lokal.';
     } else {
       try {
-        _backend.submitCheckin(
+        final checkin = _backend.submitCheckin(
           checkinId: checkinId,
           checkpointId: checkpoint.id,
           userId: _currentUser!.id,
@@ -387,6 +516,11 @@ class RondaProvider extends ChangeNotifier {
           batteryLevel: 85.0,
           forceDutyOverride: _isManualDutyActive,
         );
+
+        if (_supabase.isAvailable) {
+          unawaited(_supabase.insertCheckin(checkin));
+        }
+
         _lastSuccessMessage = 'Berhasil! Check-in terverifikasi di ${checkpoint.namaLokasi} (Jarak GPS: ${geofence.distanceMeters.toStringAsFixed(1)}m)';
       } catch (e) {
         _lastErrorMessage = e.toString().replaceAll('StateError: ', '');
@@ -421,6 +555,10 @@ class RondaProvider extends ChangeNotifier {
         catatan: catatan ?? 'Warga membunyikan alarm darurat siskamling!',
       );
 
+      if (_supabase.isAvailable) {
+        unawaited(_supabase.insertEmergency(event));
+      }
+
       _lastSuccessMessage = 'ALARM DARURAT DIAKTIFKAN! Notifikasi sirine dipancarkan ke seluruh petugas.';
       notifyListeners();
       return event;
@@ -441,6 +579,12 @@ class RondaProvider extends ChangeNotifier {
         responderId: _currentUser!.id,
         forceDutyOverride: forceDutyOverride || _isManualDutyActive,
       );
+
+      if (_supabase.isAvailable) {
+        final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
+        unawaited(_supabase.updateEmergency(event));
+      }
+
       _lastSuccessMessage = 'Anda telah menyatakan merespons insiden. Segera menuju ke lokasi warga.';
       notifyListeners();
     } catch (e) {
@@ -462,6 +606,12 @@ class RondaProvider extends ChangeNotifier {
         scannedQrPayload: scannedQrPayload,
         responderId: _currentUser!.id,
       );
+
+      if (_supabase.isAvailable) {
+        final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
+        unawaited(_supabase.updateEmergency(event));
+      }
+
       _lastSuccessMessage = 'Validasi QR Berhasil! Status darurat resmi dinyatakan SELESAI.';
       notifyListeners();
       return true;
@@ -487,6 +637,12 @@ class RondaProvider extends ChangeNotifier {
         notes: notes,
         responderId: _currentUser!.id,
       );
+
+      if (_supabase.isAvailable) {
+        final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
+        unawaited(_supabase.updateEmergency(event));
+      }
+
       _lastSuccessMessage = 'Bukti foto terkirim! Status saat ini: MENUNGGU VERIFIKASI KETUA RT.';
       notifyListeners();
       return true;
@@ -515,6 +671,12 @@ class RondaProvider extends ChangeNotifier {
         isApproved: isApproved,
         adminNotes: adminNotes,
       );
+
+      if (_supabase.isAvailable) {
+        final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
+        unawaited(_supabase.updateEmergency(event));
+      }
+
       _lastSuccessMessage = isApproved
           ? 'Laporan disetujui! Status darurat resmi ditutup (SELESAI).'
           : 'Laporan ditolak. Status dikembalikan ke ON-GOING untuk investigasi lanjut.';
@@ -528,6 +690,12 @@ class RondaProvider extends ChangeNotifier {
   /// Batalkan / selesaikan darurat langsung (misal salah tekan oleh pelapor)
   void cancelMyEmergency(String eventId) {
     _backend.resolveEmergency(eventId);
+
+    if (_supabase.isAvailable) {
+      final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
+      unawaited(_supabase.updateEmergency(event));
+    }
+
     _lastSuccessMessage = 'Alarm darurat telah dibatalkan.';
     notifyListeners();
   }
@@ -545,7 +713,7 @@ class RondaProvider extends ChangeNotifier {
     final lat = _currentGpsPosition?.latitude ?? -7.281970;
     final lon = _currentGpsPosition?.longitude ?? 112.795323;
 
-    _backend.reportIncident(
+    final report = _backend.reportIncident(
       incidentId: 'inc-${DateTime.now().millisecondsSinceEpoch}',
       userId: _currentUser!.id,
       category: category,
@@ -555,6 +723,10 @@ class RondaProvider extends ChangeNotifier {
       longitude: lon,
       compass: 90.0,
     );
+
+    if (_supabase.isAvailable) {
+      unawaited(_supabase.insertIncident(report));
+    }
 
     _lastSuccessMessage = 'Laporan insiden berhasil dikirim ke Linimasa Keamanan RT.';
     notifyListeners();
@@ -574,7 +746,7 @@ class RondaProvider extends ChangeNotifier {
   }) {
     if (_currentUser == null) return;
     try {
-      _backend.requestShiftSwap(
+      final swap = _backend.requestShiftSwap(
         requestId: 'swp-${DateTime.now().millisecondsSinceEpoch}',
         scheduleId: scheduleId,
         requesterId: _currentUser!.id,
@@ -584,6 +756,11 @@ class RondaProvider extends ChangeNotifier {
         targetDate: targetDate,
         targetShift: targetShift,
       );
+
+      if (_supabase.isAvailable) {
+        unawaited(_supabase.insertShiftSwap(swap));
+      }
+
       _lastSuccessMessage = 'Permintaan tukar jadwal terkirim ke petugas pengganti.';
       notifyListeners();
     } catch (e) {
@@ -600,6 +777,15 @@ class RondaProvider extends ChangeNotifier {
         responderId: _currentUser!.id,
         isAccepted: isAccepted,
       );
+
+      if (_supabase.isAvailable) {
+        final swap = _backend.shiftSwaps.firstWhere((s) => s.id == requestId);
+        unawaited(_supabase.updateShiftSwap(swap));
+        if (isAccepted && _currentUser != null) {
+          unawaited(_supabase.upsertSchedules(_backend.getSchedules(_currentUser!.rtId)));
+        }
+      }
+
       _lastSuccessMessage = isAccepted
           ? 'Pertukaran jadwal berhasil disetujui! Jadwal ronda Anda dan rekan otomatis diperbarui.'
           : 'Pertukaran jadwal telah ditolak.';
@@ -618,6 +804,15 @@ class RondaProvider extends ChangeNotifier {
         approverRole: _currentUser!.role,
         isApproved: isApproved,
       );
+
+      if (_supabase.isAvailable) {
+        final swap = _backend.shiftSwaps.firstWhere((s) => s.id == requestId);
+        unawaited(_supabase.updateShiftSwap(swap));
+        if (isApproved && _currentUser != null) {
+          unawaited(_supabase.upsertSchedules(_backend.getSchedules(_currentUser!.rtId)));
+        }
+      }
+
       _lastSuccessMessage = isApproved
           ? 'Perpindahan jadwal resmi disetujui. Jadwal patroli telah diperbarui.'
           : 'Pengajuan perpindahan jadwal ditolak.';
@@ -648,7 +843,7 @@ class RondaProvider extends ChangeNotifier {
     }
 
     try {
-      _backend.assignScheduleManual(
+      final sched = _backend.assignScheduleManual(
         rtId: _currentUser!.rtId,
         userId: userId,
         date: date,
@@ -657,6 +852,11 @@ class RondaProvider extends ChangeNotifier {
         jamSelesai: jamSelesai,
         isLibur: isLibur,
       );
+
+      if (_supabase.isAvailable) {
+        unawaited(_supabase.upsertSchedule(sched));
+      }
+
       _lastSuccessMessage = 'Jadwal berhasil ditetapkan untuk petugas terpilih.';
       notifyListeners();
     } catch (e) {
@@ -679,6 +879,11 @@ class RondaProvider extends ChangeNotifier {
         startDate: startDate,
         daysCount: daysCount,
       );
+
+      if (_supabase.isAvailable) {
+        unawaited(_supabase.upsertSchedules(list));
+      }
+
       _lastSuccessMessage =
           'Berhasil membentuk ${list.length} entri jadwal (rotasi 5 hari dinas + 1 libur) untuk $daysCount hari ke depan!';
       notifyListeners();
@@ -702,6 +907,11 @@ class RondaProvider extends ChangeNotifier {
         includeOffDuty: includeOffDuty,
         customMessage: customMessage,
       );
+
+      if (_supabase.isAvailable && _backend.notifications.isNotEmpty) {
+        unawaited(_supabase.insertNotification(_backend.notifications.first));
+      }
+
       _lastSuccessMessage = includeOffDuty
           ? 'Peringatan Darurat dipancarkan ke SELURUH petugas ronda (piket dan cadangan)!'
           : 'Peringatan Darurat dikirimkan ke petugas yang sedang piket.';
@@ -726,6 +936,11 @@ class RondaProvider extends ChangeNotifier {
         targetUserId: targetUserId,
         customMessage: message,
       );
+
+      if (_supabase.isAvailable && _backend.notifications.isNotEmpty) {
+        unawaited(_supabase.insertNotification(_backend.notifications.first));
+      }
+
       _lastSuccessMessage = 'Pemberitahuan peringatan check-in telah terkirim ke petugas patroli.';
       notifyListeners();
     } catch (e) {
@@ -735,6 +950,15 @@ class RondaProvider extends ChangeNotifier {
   }
 
   void refreshData() {
+    if (_currentUser != null && _supabase.isAvailable) {
+      unawaited(_initSupabaseRealtime(_currentUser!.rtId));
+    }
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _cancelSubscriptions();
+    super.dispose();
   }
 }

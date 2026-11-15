@@ -15,6 +15,7 @@ class ShiftSwapManager {
     DateTime? targetDate,
     String? targetShift,
     DateTime? createdAt,
+    List<ShiftSwapRequest>? existingSwaps,
   }) {
     if (requester.id == targetUser.id) {
       throw ArgumentError('Tidak dapat menukar jadwal dengan diri sendiri.');
@@ -26,6 +27,28 @@ class ShiftSwapManager {
 
     if (schedule.isCompleted) {
       throw StateError('Tidak dapat menukar jadwal yang sudah selesai dilaksanakan.');
+    }
+
+    // 1. Single-pending constraint (anti pengajuan ganda untuk 1 jadwal)
+    if (existingSwaps != null) {
+      final hasPending = existingSwaps.any(
+        (s) => s.scheduleId == schedule.id && s.status == ShiftSwapStatus.pending,
+      );
+      if (hasPending) {
+        throw StateError(
+          'Jadwal ini sedang dalam proses pengajuan tukar giliran yang belum selesai. Tunggu respon rekan terlebih dahulu.',
+        );
+      }
+    }
+
+    final now = createdAt ?? DateTime.now();
+
+    // 2. Batas waktu pengajuan (Maksimal H-3 jam sebelum jam dinas dimulai)
+    final deadline = schedule.startDateTime.subtract(const Duration(hours: 3));
+    if (now.isAfter(deadline)) {
+      throw StateError(
+        'Batas waktu pengajuan tukar jadwal telah lewat (Maksimal H-3 jam sebelum dinas dimulai pada ${schedule.jamMulai} WIB).',
+      );
     }
 
     return ShiftSwapRequest(
@@ -40,7 +63,7 @@ class ShiftSwapManager {
       targetDate: targetDate ?? schedule.tanggalRonda,
       targetShift: targetShift ?? 'Shift Malam',
       status: ShiftSwapStatus.pending,
-      createdAt: createdAt ?? DateTime.now(),
+      createdAt: now,
     );
   }
 
@@ -53,6 +76,7 @@ class ShiftSwapManager {
     required bool isAccepted,
     PatrolSchedule? schedule,
     PatrolSchedule? targetSchedule,
+    DateTime? responseTime,
   }) {
     if (request.targetUserId != respondingUserId) {
       throw StateError('Hanya pengguna yang ditunjuk yang berhak merespon pertukaran ini.');
@@ -60,6 +84,18 @@ class ShiftSwapManager {
 
     if (request.status != ShiftSwapStatus.pending) {
       throw StateError('Permintaan tukar jadwal ini sudah tidak dalam status pending (${request.status.name}).');
+    }
+
+    // Cek batas waktu respon (H-3 jam sebelum shift)
+    final now = responseTime ?? DateTime.now();
+    if (schedule != null) {
+      final deadline = schedule.startDateTime.subtract(const Duration(hours: 3));
+      if (now.isAfter(deadline)) {
+        request.status = ShiftSwapStatus.expired;
+        throw StateError(
+          'Permintaan tukar jadwal ini telah kedaluwarsa karena telah melewati batas waktu H-3 jam sebelum dinas dimulai (${schedule.jamMulai} WIB).',
+        );
+      }
     }
 
     if (isAccepted) {

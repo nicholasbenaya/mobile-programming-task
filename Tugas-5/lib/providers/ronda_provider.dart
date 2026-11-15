@@ -464,6 +464,14 @@ class RondaProvider extends ChangeNotifier {
       accuracy = _currentGpsPosition?.accuracy ?? 5.0;
     }
 
+    // Proteksi Anti-Mock Location (GPS Spoofing)
+    if (!simulateProximity && _currentGpsPosition?.isMocked == true) {
+      _lastErrorMessage =
+          'Validasi Keamanan Gagal: Terdeteksi penggunaan lokasi palsu (Mock Location / Fake GPS). Harap matikan aplikasi pemalsu lokasi untuk melakukan check-in resmi.';
+      notifyListeners();
+      return false;
+    }
+
     // 1. Generate QR Payload bertanda waktu pos fisik
     final qrPayload = QrTokenVerifier.generateQrPayload(
       checkpointId: checkpoint.id,
@@ -688,16 +696,26 @@ class RondaProvider extends ChangeNotifier {
   }
 
   /// Batalkan / selesaikan darurat langsung (misal salah tekan oleh pelapor)
-  void cancelMyEmergency(String eventId) {
-    _backend.resolveEmergency(eventId);
+  void cancelMyEmergency(String eventId, {String? reason}) {
+    if (_currentUser == null) return;
+    try {
+      _backend.cancelEmergency(
+        eventId: eventId,
+        userId: _currentUser!.id,
+        reason: reason,
+      );
 
-    if (_supabase.isAvailable) {
-      final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
-      unawaited(_supabase.updateEmergency(event));
+      if (_supabase.isAvailable) {
+        final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
+        unawaited(_supabase.updateEmergency(event));
+      }
+
+      _lastSuccessMessage = 'Alarm darurat telah dibatalkan secara mandiri oleh pelapor.';
+      notifyListeners();
+    } catch (e) {
+      _lastErrorMessage = e.toString().replaceAll('StateError: ', '');
+      notifyListeners();
     }
-
-    _lastSuccessMessage = 'Alarm darurat telah dibatalkan.';
-    notifyListeners();
   }
 
   // ==========================================

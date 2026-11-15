@@ -132,5 +132,102 @@ void main() {
         throwsStateError,
       );
     });
+
+    test('Gagal mengajukan jika sudah ada permintaan pending pada jadwal yang sama', () {
+      final existingReq = ShiftSwapManager.createRequest(
+        requestId: 'req-005',
+        schedule: schedule,
+        requester: petugasAwal,
+        targetUser: calonPengganti,
+        alasan: 'Urusan pertama',
+      );
+
+      expect(
+        () => ShiftSwapManager.createRequest(
+          requestId: 'req-006',
+          schedule: schedule,
+          requester: petugasAwal,
+          targetUser: calonPengganti,
+          alasan: 'Urusan kedua (duplikat pending)',
+          existingSwaps: [existingReq],
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('Gagal mengajukan jika melewati batas waktu H-3 jam sebelum jam dinas dimulai', () {
+      final lateSchedule = PatrolSchedule(
+        id: 'sched-late',
+        rtId: 'rt-04',
+        userId: 'user-01',
+        petugasName: 'Petugas Jordi',
+        tanggalRonda: DateTime.now(),
+        jamMulai: '22:00',
+      );
+
+      // Simulasikan waktu pengajuan pada jam 20:30 (H-1.5 jam < H-3 jam)
+      final lateNow = DateTime(
+        lateSchedule.tanggalRonda.year,
+        lateSchedule.tanggalRonda.month,
+        lateSchedule.tanggalRonda.day,
+        20,
+        30,
+      );
+
+      expect(
+        () => ShiftSwapManager.createRequest(
+          requestId: 'req-007',
+          schedule: lateSchedule,
+          requester: petugasAwal,
+          targetUser: calonPengganti,
+          alasan: 'Mendadak',
+          createdAt: lateNow,
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('Permintaan otomatis menjadi expired jika direspons setelah melewati batas waktu H-3 jam', () {
+      final futureSchedule = PatrolSchedule(
+        id: 'sched-future',
+        rtId: 'rt-04',
+        userId: 'user-01',
+        petugasName: 'Petugas Jordi',
+        tanggalRonda: DateTime.now().add(const Duration(days: 1)),
+        jamMulai: '22:00',
+      );
+
+      final request = ShiftSwapManager.createRequest(
+        requestId: 'req-008',
+        schedule: futureSchedule,
+        requester: petugasAwal,
+        targetUser: calonPengganti,
+        alasan: 'Tukar giliran',
+      );
+
+      // Rekan merespon pada jam 21:00 hari H (hanya H-1 jam sebelum shift)
+      final expiredResponseTime = DateTime(
+        futureSchedule.tanggalRonda.year,
+        futureSchedule.tanggalRonda.month,
+        futureSchedule.tanggalRonda.day,
+        21,
+        0,
+      );
+
+      expect(
+        () => ShiftSwapManager.respondByTargetUser(
+          request: request,
+          respondingUserId: calonPengganti.id,
+          isAccepted: true,
+          schedule: futureSchedule,
+          responseTime: expiredResponseTime,
+        ),
+        throwsStateError,
+      );
+
+      expect(request.status, equals(ShiftSwapStatus.expired));
+      // Jadwal tidak boleh bermutasi karena sudah kedaluwarsa
+      expect(futureSchedule.userId, equals(petugasAwal.id));
+    });
   });
 }

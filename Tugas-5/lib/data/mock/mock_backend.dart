@@ -23,6 +23,9 @@ class MockBackend {
 
   final List<RondaNotification> _notifications = [];
 
+  final Map<String, int> _failedLoginAttempts = {};
+  final Map<String, DateTime> _lockoutUntil = {};
+
   final SosEventDispatcher _sosDispatcher = SosEventDispatcher(debounceWindowSeconds: 15);
   final List<FcmEmergencyPayload> fcmBroadcastHistory = [];
 
@@ -39,17 +42,40 @@ class MockBackend {
         s.tanggalRonda.day == now.day);
   }
 
-  // 1. Auth Endpoint: POST /api/auth/login (Terenkripsi SHA-256)
-  RondaUser login({required String whatsapp, required String password}) {
+  // 1. Auth Endpoint: POST /api/auth/login (Terenkripsi SHA-256 + Rate Limiting)
+  RondaUser login({required String whatsapp, required String password, DateTime? currentTime}) {
     final cleanPhone = whatsapp.trim().replaceAll(' ', '').replaceAll('-', '');
+    final now = currentTime ?? DateTime.now();
+
+    // Proteksi brute force: Cek status lockout sementara
+    final lockout = _lockoutUntil[cleanPhone];
+    if (lockout != null && now.isBefore(lockout)) {
+      final sisaMenit = lockout.difference(now).inMinutes + 1;
+      throw StateError(
+        'Akun terkunci sementara karena 5 kali percobaan salah berturut-turut (ERR_AUTH_LOCKOUT). Coba lagi dalam $sisaMenit menit.',
+      );
+    }
+
     final user = _users.firstWhere(
       (u) => u.nomorWhatsapp.replaceAll(' ', '').replaceAll('-', '') == cleanPhone,
       orElse: () => throw StateError('Nomor WhatsApp $whatsapp tidak terdaftar di sistem siskamling RT.'),
     );
 
     if (!user.verifyPassword(password)) {
-      throw StateError('Kata sandi yang Anda masukkan salah. Silakan coba lagi.');
+      final attempts = (_failedLoginAttempts[cleanPhone] ?? 0) + 1;
+      _failedLoginAttempts[cleanPhone] = attempts;
+      if (attempts >= 5) {
+        _lockoutUntil[cleanPhone] = now.add(const Duration(minutes: 15));
+        throw StateError(
+          'Batas 5 kali percobaan salah tercapai. Akun Anda dikunci sementara selama 15 menit (ERR_AUTH_LOCKOUT).',
+        );
+      }
+      throw StateError('Kata sandi yang Anda masukkan salah. Percobaan gagal: $attempts/5.');
     }
+
+    // Reset counter setelah login berhasil
+    _failedLoginAttempts.remove(cleanPhone);
+    _lockoutUntil.remove(cleanPhone);
 
     return user;
   }
@@ -303,6 +329,7 @@ class MockBackend {
     String? requesterShift,
     DateTime? targetDate,
     String? targetShift,
+    DateTime? createdAt,
   }) {
     final schedule = _schedules.firstWhere((s) => s.id == scheduleId);
     final requester = _users.firstWhere((u) => u.id == requesterId);
@@ -317,6 +344,8 @@ class MockBackend {
       requesterShift: requesterShift,
       targetDate: targetDate,
       targetShift: targetShift,
+      createdAt: createdAt,
+      existingSwaps: _shiftSwaps,
     );
 
     _shiftSwaps.insert(0, request);
@@ -538,9 +567,30 @@ class MockBackend {
     );
   }
 
-  void resolveEmergency(String eventId) {
+  void resolveEmergency(String eventId, {String? reason}) {
     final event = _emergencyEvents.firstWhere((e) => e.id == eventId);
     _sosDispatcher.resolveEmergency(event);
+    if (reason != null) {
+      event.resolutionNotes = reason;
+    }
+  }
+
+  /// Pembatalan alarm darurat palsu (false alarm) secara mandiri oleh warga pelapor
+  void cancelEmergency({
+    required String eventId,
+    required String userId,
+    String? reason,
+  }) {
+    final event = _emergencyEvents.firstWhere((e) => e.id == eventId);
+    if (event.userId != userId) {
+      throw StateError('Akses Ditolak: Hanya warga pelapor yang berhak membatalkan alarm darurat ini.');
+    }
+    if (event.status == EmergencyStatus.selesai) {
+      throw StateError('Alarm darurat ini sudah berstatus selesai dan tidak dapat dibatalkan.');
+    }
+    event.status = EmergencyStatus.selesai;
+    event.resolvedAt = DateTime.now();
+    event.resolutionNotes = 'DIBATALKAN PELAPOR: ${reason ?? "Alarm palsu / tidak sengaja tertekan"}';
   }
 
   // 6. Insiden Kejadian Berfoto: POST /api/incidents

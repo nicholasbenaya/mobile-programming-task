@@ -862,6 +862,10 @@ class AdminRtDashboard extends StatelessWidget {
                 statusColor = AppColors.patrolAccent;
                 statusText = 'Menunggu Respon Rekan';
                 break;
+              case ShiftSwapStatus.expired:
+                statusColor = AppColors.textSecondaryLight;
+                statusText = 'Kedaluwarsa (H-3 Jam)';
+                break;
             }
 
             return Card(

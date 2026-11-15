@@ -305,7 +305,9 @@ void main() async {
   // LANGKAH 10: Peer-to-Peer Shift Swap & Laporan Kejadian Warga (Non-SOS)
   // -------------------------------------------------------------------------
   print('\n[LANGKAH 10/10] Pertukaran Jadwal Peer-to-Peer & Laporan Warga Non-SOS');
-  final scheduleDevi = backend.getSchedules(petugasDevi.rtId).firstWhere((s) => s.userId == petugasDevi.id && !s.isLibur);
+  final scheduleDevi = backend.getSchedules(petugasDevi.rtId).firstWhere(
+    (s) => s.userId == petugasDevi.id && !s.isLibur && s.startDateTime.isAfter(DateTime.now().add(const Duration(hours: 4))),
+  );
 
   final swapReq = backend.requestShiftSwap(
     requestId: 'swap-dev-01',

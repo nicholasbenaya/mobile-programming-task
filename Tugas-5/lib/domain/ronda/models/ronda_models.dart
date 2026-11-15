@@ -144,7 +144,8 @@ enum ShiftSwapStatus {
   pending,
   acceptedByTarget,
   rejected,
-  approvedByAdmin;
+  approvedByAdmin,
+  expired;
 
   String get label {
     switch (this) {
@@ -155,6 +156,8 @@ enum ShiftSwapStatus {
         return 'Disetujui Bersama (Jadwal Resmi Berpindah)';
       case ShiftSwapStatus.rejected:
         return 'Ditolak Rekan';
+      case ShiftSwapStatus.expired:
+        return 'Kedaluwarsa (Lewat Batas Waktu H-3 Jam)';
     }
   }
 }
@@ -417,6 +420,14 @@ class PatrolSchedule {
   final String jamSelesai;
   bool isCompleted;
   bool isLibur;
+
+  /// Waktu pasti dimulainya dinas shift ini
+  DateTime get startDateTime {
+    final parts = jamMulai.split(':');
+    final h = int.tryParse(parts[0]) ?? 22;
+    final m = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+    return DateTime(tanggalRonda.year, tanggalRonda.month, tanggalRonda.day, h, m);
+  }
 
   /// Memeriksa apakah waktu tertentu berada dalam rentang shift ini
   bool isTimeInShift(DateTime time) {

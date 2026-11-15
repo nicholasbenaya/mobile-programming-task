@@ -1101,6 +1101,10 @@ class PetugasRondaDashboard extends StatelessWidget {
                 statusColor = AppColors.verified;
                 statusLabel = 'Disahkan RT';
                 break;
+              case ShiftSwapStatus.expired:
+                statusColor = AppColors.textSecondaryLight;
+                statusLabel = 'Kedaluwarsa (H-3 Jam)';
+                break;
             }
 
             return Container(

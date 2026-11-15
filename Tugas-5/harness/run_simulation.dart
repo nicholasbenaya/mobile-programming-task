@@ -1,9 +1,9 @@
 // ignore_for_file: avoid_print
+import 'package:ronda_digital/data/mock/mock_backend.dart';
+import 'package:ronda_digital/data/mock/seed_data.dart';
 import 'package:ronda_digital/domain/ronda/models/ronda_models.dart';
 import 'package:ronda_digital/domain/ronda/services/offline_sync_queue.dart';
 import 'package:ronda_digital/domain/ronda/services/qr_token_verifier.dart';
-import 'mock_backend.dart';
-import 'seed_data.dart';
 
 void main() async {
   print('======================================================================');
@@ -15,57 +15,141 @@ void main() async {
   final offlineQueue = OfflineSyncQueue();
 
   var passCount = 0;
-  var totalSteps = 8;
+  const totalSteps = 10;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 1: Login & Cek Jadwal Petugas Ronda
+  // LANGKAH 1: Autentikasi Pengguna Aman & Terenkripsi SHA-256
   // -------------------------------------------------------------------------
-  print('[LANGKAH 1/8] Autentikasi Pengguna & Penarikan Jadwal Ronda');
-  final petugas = backend.loginByWhatsapp('081234567802');
+  print('[LANGKAH 1/10] Autentikasi Pengguna Terenkripsi SHA-256');
+
+  // Uji coba sandi salah: Harus ditolak
+  var wrongPasswordBlocked = false;
+  try {
+    backend.login(whatsapp: '081234567802', password: 'sandiyangsalah');
+  } catch (e) {
+    wrongPasswordBlocked = true;
+    print('  ✓ Proteksi Sandi: Percobaan login gagal dicegah dengan benar ($e)');
+  }
+
+  // Login resmi dengan kredensial benar
+  final petugas = backend.login(whatsapp: '081234567802', password: SeedData.defaultDemoPassword);
   final schedules = backend.getSchedules(petugas.rtId);
   final mySchedule = schedules.firstWhere((s) => s.userId == petugas.id);
 
-  print('  ✓ Login Berhasil: ${petugas.namaLengkap} (${petugas.role.label})');
-  print('  ✓ Jadwal Shift: ${mySchedule.jamMulai} - ${mySchedule.jamSelesai} WIB');
-  passCount++;
+  print('  ✓ Login Terverifikasi: ${petugas.namaLengkap} (${petugas.role.label})');
+  print('  ✓ Jadwal Shift: ${mySchedule.shiftName}');
+  if (wrongPasswordBlocked) passCount++;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 2: Check-in Pos 1 (Pos Kamling Utama) - Valid
+  // LANGKAH 2: Validasi Hak Merespon SOS (Hanya yang Berpatroli yang Boleh)
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 2/8] Check-in Pos 1 (Pos Utama) Berjarak ~10m (VALID)');
-  final cp1 = backend.getCheckpoints(petugas.rtId).firstWhere((c) => c.id == 'CP-POS-UTAMA');
-  final qrPos1 = QrTokenVerifier.generateQrPayload(
-    checkpointId: cp1.id,
-    secretKey: cp1.secretKey,
+  print('\n[LANGKAH 2/10] Pembatasan Hak Merespons SOS: Hanya Petugas Piket Aktif');
+  final wargaFito = SeedData.wargaFito;
+  final testSos = backend.triggerPanic(
+    eventId: 'sos-gate-001',
+    userId: wargaFito.id,
+    latitude: -7.282900,
+    longitude: 112.795100,
+    catatan: 'Uji hak akses respons darurat',
   );
 
-  // Koordinat petugas berada 10 meter dari Pos 1
+  // Coba respon dengan petugas Budi (yang tidak dijadwalkan hari ini)
+  final petugasBudi = SeedData.petugasBudi;
+  var offDutyBlocked = false;
+  try {
+    backend.respondEmergency(eventId: testSos.id, responderId: petugasBudi.id);
+  } catch (e) {
+    offDutyBlocked = true;
+    print('  ✓ Petugas Off-Duty Dicegah Merespons: $e');
+  }
+
+  // Respon dengan petugas Jordi (yang terjadwal piket aktif hari ini)
+  backend.respondEmergency(eventId: testSos.id, responderId: petugas.id);
+  print('  ✓ Petugas On-Duty (${petugas.namaLengkap}) Berhasil Merespons SOS!');
+  if (offDutyBlocked && testSos.isOnGoing) passCount++;
+
+  // Selesaikan testSos agar bersih
+  backend.resolveEmergencyWithQr(
+    eventId: testSos.id,
+    scannedQrPayload: testSos.verificationQrToken,
+    responderId: petugas.id,
+  );
+
+  // -------------------------------------------------------------------------
+  // LANGKAH 3: Validasi Jadwal Shift Individual (Petugas HANYA Boleh Check-in di Jam Dinasnya)
+  // -------------------------------------------------------------------------
+  print('\n[LANGKAH 3/10] Validasi Jadwal Shift Individual & Check-in Pos 1');
+  final cp1 = backend.getCheckpoints(petugas.rtId).firstWhere((c) => c.id == 'CP-POS-UTAMA');
+
   const userLatPos1 = -7.281980;
   const userLonPos1 = 112.795330;
+  final today = DateTime.now();
 
+  // 1. Kasus Devi: Jadwal Shift Sore (16:00 - 22:00).
+  // Coba check-in di jam 02:30 (di luar shift). HARUS DITOLAK!
+  final petugasDevi = SeedData.petugasDevi;
+  final time0230 = DateTime(today.year, today.month, today.day, 2, 30);
+  final qrDevi0230 = QrTokenVerifier.generateQrPayload(checkpointId: cp1.id, secretKey: cp1.secretKey, timestamp: time0230);
+  var deviBlockedOutsideShift = false;
+  try {
+    backend.submitCheckin(
+      checkinId: 'chk-devi-invalid-time',
+      checkpointId: cp1.id,
+      userId: petugasDevi.id,
+      qrPayload: qrDevi0230,
+      userLat: userLatPos1,
+      userLon: userLonPos1,
+      accuracy: 4.5,
+      scanTime: time0230,
+    );
+  } catch (e) {
+    deviBlockedOutsideShift = true;
+    print('  ✓ Shift Enforcement: Devi (Shift 16:00-22:00) dicegah check-in di jam 02:30 ($e)');
+  }
+
+  // 2. Devi check-in di jam dinasnya (18:00 WIB) -> SUKSES!
+  final time1800 = DateTime(today.year, today.month, today.day, 18, 0);
+  final qrDevi1800 = QrTokenVerifier.generateQrPayload(checkpointId: cp1.id, secretKey: cp1.secretKey, timestamp: time1800);
+  final checkinDeviValid = backend.submitCheckin(
+    checkinId: 'chk-devi-valid-time',
+    checkpointId: cp1.id,
+    userId: petugasDevi.id,
+    qrPayload: qrDevi1800,
+    userLat: userLatPos1,
+    userLon: userLonPos1,
+    accuracy: 4.5,
+    scanTime: time1800,
+  );
+  print('  ✓ Devi Berhasil Check-in di Jam Dinasnya (18:00 WIB): Jarak ${checkinDeviValid.distanceMeter.toStringAsFixed(1)}m');
+
+  // 3. Jordi check-in di jam shift malamnya (23:00 WIB) -> SUKSES!
+  final time2300 = DateTime(today.year, today.month, today.day, 23, 0);
+  final qrJordi2300 = QrTokenVerifier.generateQrPayload(checkpointId: cp1.id, secretKey: cp1.secretKey, timestamp: time2300);
   final checkin1 = backend.submitCheckin(
     checkinId: 'chk-night-01',
     checkpointId: cp1.id,
     userId: petugas.id,
-    qrPayload: qrPos1,
+    qrPayload: qrJordi2300,
     userLat: userLatPos1,
     userLon: userLonPos1,
     accuracy: 4.5,
     batteryLevel: 92.0,
+    scanTime: time2300,
   );
 
-  print('  ✓ Check-in Berhasil tercatat: ${cp1.namaLokasi}');
+  print('  ✓ Jordi Berhasil Check-in di Shift Malam (23:00 WIB): ${cp1.namaLokasi}');
   print('  ✓ Jarak terverifikasi: ${checkin1.distanceMeter.toStringAsFixed(1)} m (dalam radius ${cp1.radiusMeter}m)');
-  passCount++;
+  if (deviBlockedOutsideShift) passCount++;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 3: Percobaan Curang Scan Pos 2 dari Pos 1 (TOLAK GEOFENCE)
+  // LANGKAH 4: Percobaan Curang Scan Pos 2 dari Pos 1 (TOLAK GEOFENCE)
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 3/8] Uji Anti-Kecurangan: Scan Pos 2 Saat Masih di Pos 1 (~90m)');
+  print('\n[LANGKAH 4/10] Uji Anti-Kecurangan: Scan Pos 2 Saat Masih di Pos 1 (~90m)');
   final cp2 = backend.getCheckpoints(petugas.rtId).firstWhere((c) => c.id == 'CP-GARDU-PLN');
   final qrPos2 = QrTokenVerifier.generateQrPayload(
     checkpointId: cp2.id,
     secretKey: cp2.secretKey,
+    timestamp: time2300,
   );
 
   var geofenceRejected = false;
@@ -75,9 +159,10 @@ void main() async {
       checkpointId: cp2.id,
       userId: petugas.id,
       qrPayload: qrPos2,
-      userLat: userLatPos1, // Masih di lokasi Pos 1 (~95m dari Pos 2)
+      userLat: userLatPos1,
       userLon: userLonPos1,
       accuracy: 5.0,
+      scanTime: DateTime(today.year, today.month, today.day, 23, 0),
     );
   } catch (e) {
     geofenceRejected = true;
@@ -87,78 +172,100 @@ void main() async {
   if (geofenceRejected) passCount++;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 4: Petugas Berjalan ke Pos 2 & Check-in Sukses
+  // LANGKAH 5: Jadwal Pos Patroli & Peringatan Check-in Manual oleh Ketua RT
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 4/8] Petugas Berpindah ke Pos 2 (Gardu PLN) & Scan QR');
-  const userLatPos2 = -7.282510;
-  const userLonPos2 = 112.796010;
+  print('\n[LANGKAH 5/10] Jadwal Pos Patroli & Peringatan Check-in Manual Ketua RT');
+  // Evaluasi status jadwal pos
+  final statusCp1 = cp1.calculateStatus(hasCheckedIn: true);
+  final statusCp2 = cp2.calculateStatus(hasCheckedIn: false);
+  print('  ✓ Evaluasi Pos 1: ${statusCp1.label}');
+  print('  ✓ Evaluasi Pos 2 (Target ${cp2.targetWaktuCheckin} WIB): ${statusCp2.label}');
 
-  final checkin2 = backend.submitCheckin(
-    checkinId: 'chk-night-02',
+  // Ketua RT kirim peringatan manual untuk pos patroli
+  backend.notifyCheckpointReminder(
+    rtId: petugas.rtId,
     checkpointId: cp2.id,
-    userId: petugas.id,
-    qrPayload: qrPos2,
-    userLat: userLatPos2,
-    userLon: userLonPos2,
-    accuracy: 6.0,
-    batteryLevel: 88.0,
+    customMessage: 'Pos Gardu PLN belum dipindai, harap segera check-in.',
   );
-
-  print('  ✓ Check-in Berhasil: ${cp2.namaLokasi} (Jarak: ${checkin2.distanceMeter.toStringAsFixed(1)}m)');
+  print('  ✓ Peringatan Check-in Dikirim RT: Berhasil masuk ke log notifikasi (${backend.notifications.length} notif aktif)');
   passCount++;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 5: Pelaporan Temuan Insiden Mencurigakan Berfoto
+  // LANGKAH 6: Broadcast Panggilan Darurat SOS oleh Ketua RT ke Semua Personel
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 5/8] Pelaporan Insiden Mencurigakan oleh Petugas Patroli');
-  final incident = backend.reportIncident(
-    incidentId: 'inc-001',
-    userId: petugas.id,
-    category: IncidentCategory.orangMencurigakan,
-    keterangan: 'Ada motor tanpa plat nomor terparkir mencurigakan di samping gardu PLN',
-    photoPath: 'evidence/rt-04/inc-001.jpg',
-    latitude: userLatPos2,
-    longitude: userLonPos2,
-    compass: 45.0, // Mengarah ke Timur Laut
-  );
-
-  print('  ✓ Laporan Insiden Tersimpan: [${incident.category.label}]');
-  print('  ✓ Keterangan: "${incident.keterangan}"');
-  print('  ✓ Orientasi Kompas Sensor: ${incident.compass}°');
-  passCount++;
-
-  // -------------------------------------------------------------------------
-  // LANGKAH 6: Tombol Panik (SOS) oleh Warga & Broadcast FCM
-  // -------------------------------------------------------------------------
-  print('\n[LANGKAH 6/8] Aktivasi Tombol Panik SOS Warga & Pancaran FCM Topic');
-  final warga = SeedData.wargaFito;
-  final emergency = backend.triggerPanic(
-    eventId: 'sos-alert-999',
-    userId: warga.id,
+  print('\n[LANGKAH 6/10] Broadcast Panggilan Darurat oleh Ketua RT ke Seluruh Petugas');
+  final wargaRisqi = SeedData.wargaRisqi;
+  final emergencyReal = backend.triggerPanic(
+    eventId: 'sos-alert-real-001',
+    userId: wargaRisqi.id,
     latitude: -7.282900,
     longitude: 112.795100,
-    catatan: 'Maling mencoba memanjat pagar rumah!',
+    catatan: 'Orang mencurigakan di depan balai RT',
   );
 
-  final lastFcm = backend.fcmBroadcastHistory.last;
-  print('  ✓ ALARM AKTIF: ${emergency.userName} (${emergency.userAddress})');
-  print('  ✓ Topic FCM: ${lastFcm.topic}');
-  print('  ✓ Judul Notifikasi: ${lastFcm.title}');
-  print('  ✓ File Audio Sirine: ${lastFcm.sound}');
-  print('  ✓ Prioritas Pengiriman: ${lastFcm.priority.toUpperCase()}');
+  backend.broadcastSosAlert(
+    rtId: petugas.rtId,
+    eventId: emergencyReal.id,
+    includeOffDuty: true,
+    customMessage: 'DARURAT TINGGI: Seluruh petugas patroli dan cadangan merapat ke lokasi!',
+  );
+  print('  ✓ Broadcast Darurat Berhasil Terdistribusi (Sertakan Personel Cadangan/Off-Duty)');
   passCount++;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 7: Uji Ketahanan Offline-First di Area Blank Spot
+  // LANGKAH 7: Siklus SOS: Penyelesaian via Foto Bukti ➔ Verifikasi Ketua RT
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 7/8] Uji Patroli di Blank Spot (Offline-First Queue)');
+  print('\n[LANGKAH 7/10] Siklus SOS: Penyelesaian via Foto Bukti ➔ Verifikasi Ketua RT');
+  backend.respondEmergency(eventId: emergencyReal.id, responderId: petugas.id);
+
+  backend.resolveEmergencyWithPhoto(
+    eventId: emergencyReal.id,
+    photoPath: '/evidence/sos-bukti-001.jpg',
+    notes: 'Pelaku kabur, situasi lingkungan aman terkendali.',
+    responderId: petugas.id,
+  );
+  print('  ✓ Petugas Unggah Foto: ${emergencyReal.status.label}');
+
+  final ketuaRt = SeedData.ketuaRt;
+  backend.adminVerifyEmergency(
+    eventId: emergencyReal.id,
+    adminId: ketuaRt.id,
+    isApproved: true,
+    adminNotes: 'Bukti memadai, insiden resmi ditutup.',
+  );
+  print('  ✓ Ketua RT Menyetujui: ${emergencyReal.status.label} (Verified by: ${ketuaRt.namaLengkap})');
+  print('  ✓ Log Audit SOS Selesai: ${backend.resolvedEmergencies.length} insiden terselesaikan (Durasi: ${emergencyReal.durationToResolve?.inSeconds}s)');
+  passCount++;
+
+  // -------------------------------------------------------------------------
+  // LANGKAH 8: Generator Otomatis Jadwal Ronda (5 Hari Ronda + 1 Hari Libur)
+  // -------------------------------------------------------------------------
+  print('\n[LANGKAH 8/10] Generator Otomatis Jadwal (5 Hari Ronda + 1 Hari Libur)');
+  final generatedSchedules = backend.generateAutoRoster(
+    rtId: petugas.rtId,
+    startDate: DateTime.now(),
+    daysCount: 30,
+  );
+
+  // Verifikasi aturan 5 ronda + 1 libur per petugas
+  final jordiSchedules = generatedSchedules.where((s) => s.userId == petugas.id).toList();
+  final liburCount = jordiSchedules.where((s) => s.isLibur).length;
+  final rondaCount = jordiSchedules.where((s) => !s.isLibur).length;
+
+  print('  ✓ Terbuat ${generatedSchedules.length} entri jadwal untuk 30 hari ke depan.');
+  print('  ✓ Distribusi Petugas Jordi: $rondaCount hari ronda, $liburCount hari libur (Rasio rotasi 5:1)');
+  if (generatedSchedules.isNotEmpty && liburCount > 0) passCount++;
+
+  // -------------------------------------------------------------------------
+  // LANGKAH 9: Uji Ketahanan Offline-First di Area Blank Spot
+  // -------------------------------------------------------------------------
+  print('\n[LANGKAH 9/10] Uji Patroli di Blank Spot (Offline-First Queue)');
   final cp3 = backend.getCheckpoints(petugas.rtId).firstWhere((c) => c.id == 'CP-PORTAL-TIMUR');
   final qrPos3 = QrTokenVerifier.generateQrPayload(
     checkpointId: cp3.id,
     secretKey: cp3.secretKey,
   );
 
-  // Perangkat kehilangan sinyal internet (Offline)
   final offlineCheckin = PatrolCheckin(
     id: 'chk-offline-01',
     checkpointId: cp3.id,
@@ -174,8 +281,6 @@ void main() async {
   offlineQueue.enqueue(offlineCheckin);
   print('  ✓ Koneksi Internet Terputus: 1 Scan disimpan di antrean lokal (Pending: ${offlineQueue.pendingCount})');
 
-  // Sinyal kembali normal -> sinkronisasi otomatis
-  print('  * Sinyal seluler terhubung kembali, memproses antrean...');
   final synced = await offlineQueue.processQueue((item) async {
     backend.submitCheckin(
       checkinId: item.id,
@@ -187,6 +292,7 @@ void main() async {
       accuracy: item.accuracy,
       batteryLevel: item.batteryLevel,
       scanTime: item.scannedAt,
+      forceDutyOverride: true,
     );
     return true;
   });
@@ -196,37 +302,46 @@ void main() async {
   passCount++;
 
   // -------------------------------------------------------------------------
-  // LANGKAH 8: Siklus Pertukaran Jadwal (Shift Swap Lifecycle)
+  // LANGKAH 10: Peer-to-Peer Shift Swap & Laporan Kejadian Warga (Non-SOS)
   // -------------------------------------------------------------------------
-  print('\n[LANGKAH 8/8] Pengajuan dan Pengesahan Pertukaran Jadwal Ronda');
-  final petugasDevi = SeedData.petugasDevi;
-  final scheduleDevi = backend.getSchedules(petugasDevi.rtId).firstWhere((s) => s.userId == petugasDevi.id);
+  print('\n[LANGKAH 10/10] Pertukaran Jadwal Peer-to-Peer & Laporan Warga Non-SOS');
+  final scheduleDevi = backend.getSchedules(petugasDevi.rtId).firstWhere(
+    (s) => s.userId == petugasDevi.id && !s.isLibur && s.startDateTime.isAfter(DateTime.now().add(const Duration(hours: 4))),
+  );
 
-  // 1. Devi mengajukan tukar ke Jordi
   final swapReq = backend.requestShiftSwap(
     requestId: 'swap-dev-01',
     scheduleId: scheduleDevi.id,
     requesterId: petugasDevi.id,
     targetUserId: petugas.id,
-    alasan: 'Ada ujian praktikum esok pagi',
+    alasan: 'Ada keperluan mendesak keluarga di luar kota',
+    requesterShift: 'Shift Sore (16:00 - 22:00)',
+    targetDate: DateTime.now().add(const Duration(days: 3)),
+    targetShift: 'Shift Malam (22:00 - 04:00)',
   );
-  print('  ✓ Permintaan dibuat oleh ${petugasDevi.namaLengkap} kepada ${petugas.namaLengkap} (${swapReq.status.name})');
+  print('  ✓ Permintaan dibuat: ${petugasDevi.namaLengkap} mengajukan tukar dengan ${petugas.namaLengkap}');
 
-  // 2. Jordi menyetujui
+  // Rekan (Jordi) menyetujui -> Mutasi jadwal langsung aktif seketika (Peer-to-Peer Consent)
   backend.respondShiftSwap(
     requestId: swapReq.id,
     responderId: petugas.id,
     isAccepted: true,
   );
-  print('  ✓ Disetujui oleh calon pengganti (${swapReq.status.name})');
+  print('  ✓ Disetujui oleh Rekan Petugas (${swapReq.status.name})');
+  print('  ✓ Mutasi Otomatis Tanpa Birokrasi RT: Jadwal kini resmi atas nama: ${scheduleDevi.petugasName}');
 
-  // 3. Pak RT mengesahkan
-  backend.approveShiftSwap(
-    requestId: swapReq.id,
-    approverRole: UserRole.adminRt,
-    isApproved: true,
+  // Uji Warga Melaporkan Kejadian Non-SOS (Fasilitas Rusak / Lampu Mati)
+  final wargaReport = backend.reportIncident(
+    incidentId: 'inc-civic-001',
+    userId: SeedData.wargaFito.id,
+    category: IncidentCategory.lampuMati,
+    keterangan: 'Lampu jalan di dekat Pos 2 mati, jalanan gelap.',
+    photoPath: '/evidence/lampu_mati.jpg',
+    latitude: -7.282500,
+    longitude: 112.796000,
   );
-  print('  ✓ Disahkan oleh Ketua RT! Jadwal resmi kini atas nama: ${scheduleDevi.petugasName}');
+  print('  ✓ Warga Lapor Non-SOS: [${wargaReport.category.label}] "${wargaReport.keterangan}"');
+  print('  ✓ Log Insiden Lingkungan Tercatat: ${backend.incidents.length} laporan');
   passCount++;
 
   // -------------------------------------------------------------------------

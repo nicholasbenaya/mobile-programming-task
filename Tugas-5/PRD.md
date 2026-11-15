@@ -7,8 +7,8 @@
 - **Judul Produk**: Ronda Digital — Siskamling Modern Lingkungan RT/RW
 - **Inisiator / Pengembang**: Kelompok 4 · Teknik Komputer ITS
 - **Basis Kode Awal**: Aplikasi `SensorLog` (`Tugas-4` Flutter Mobile App)
-- **Status**: Perencanaan Arsitektur & Spesifikasi Kebutuhan (PRD)
-- **Target Platform**: Android & iOS (Flutter), Backend (Node.js/Express/TypeScript + Prisma + MySQL)
+- **Status**: Perencanaan Arsitektur & Spesifikasi Kebutuhan Teruji (PRD v3.0 - QA Reviewed)
+- **Target Platform**: Android & iOS (Flutter), Cloud Backend (Supabase PostgreSQL + Realtime) dengan Mesin Resiliensi Dual-Mode (Offline-First Local Queue)
 
 ---
 
@@ -44,7 +44,7 @@ Aplikasi `SensorLog` memiliki fondasi arsitektur **Clean Architecture sederhana 
 | **Map Screen** (`map_screen.dart`, `flutter_map`) | Menampilkan pin catatan observasi pada OpenStreetMap. | **Peta Keamanan RT**: Menampilkan batas wilayah RT, titik-titik pos checkpoint (warna merah jika belum dipindai, hijau jika sudah), dan indikator darurat merah berkedip saat ada SOS aktif. | **Diperluas** |
 | **UI Motion & Feedback** (`press_scale.dart`, `loading_button.dart`, `shimmer_skeleton.dart`) | Interaksi haptic feedback, scale button, dan transisi halus. | Digunakan langsung pada tombol **SOS Panik** (long press with haptic warning), tombol check-in, dan list laporan ronda. | **Digunakan Kembali 100%** |
 | **Export Service** (`export_service.dart`) | Ekspor catatan observasi ke CSV via `share_plus`. | **Laporan Bulanan RT**: Ekspor rekapitulasi kehadiran ronda dan log kejadian untuk rapat warga/LPJ Ketua RT. | **Dipertahankan** |
-| **Data Layer & Backend** (`supabase_service.dart`) | Supabase PostgreSQL + Auth privat perorangan. | Ditransformasikan menjadi arsitektur backend mandiri berbasis **Node.js + Express + TypeScript + Prisma ORM + MySQL** serta dukungan **Offline-first local cache** (SQLite/Hive) saat patroli di blind spot sinyal. | **Refactor Arsitektur** |
+| **Data Layer & Backend** (`supabase_service.dart`) | Supabase PostgreSQL + Auth privat perorangan. | Ditransformasikan menjadi arsitektur cloud terpadu berbasis **Supabase PostgreSQL + Realtime Stream Publication** serta dukungan **Offline-first local queue (SQLite / in-memory resilient queue)** saat patroli di blind spot sinyal. | **Refactor Arsitektur** |
 
 ---
 
@@ -79,275 +79,309 @@ graph TD
 
 | Fitur / Modul | Admin (Ketua RT) | Petugas Ronda | Warga |
 | :--- | :---: | :---: | :---: |
-| Mengatur jadwal ronda & penugasan warga | ✅ Penuh | ❌ | ❌ |
-| Mengajukan & menyetujui tukar giliran ronda | ✅ Menyetujui | ✅ Mengajukan | ❌ |
-| Generate & cetak QR Code Checkpoint | ✅ Penuh | ❌ | ❌ |
-| Pemindaian Check-in QR + Validasi GPS | ❌ (Kecuali giliran tugas) | ✅ Penuh | ❌ |
-| Input Laporan Kejadian (Foto + Catatan + GPS) | ✅ Penuh | ✅ Penuh | ✅ Laporan Khusus |
-| Mengaktifkan Tombol Panik (SOS Alarm) | ✅ | ✅ | ✅ |
-| Menerima Push Notification Darurat (FCM) | ✅ | ✅ | ✅ |
-| Monitoring Peta Patroli & Titik Pantau RT | ✅ Real-time | ✅ Selama shift | ✅ Status terverifikasi |
-| Ekspor Laporan & Statistik Ronda | ✅ Penuh (CSV/PDF) | ❌ | ❌ |
+| Mengatur jadwal ronda manual/otomatis di kalender dinamis | ✅ Penuh | ❌ | ❌ |
+| Mengajukan & menyetujui tukar jadwal (Peer-to-Peer Consent) | 👁️ Log Audit | ✅ Langsung Rekan | ❌ |
+| Peta Interaktif Patroli & Titik Pos (OpenStreetMap) | ✅ Monitoring RT | ✅ Interaktif + Scan | ✅ Transparansi Pos |
+| Check-in Checkpoint QR + Geofence GPS Individual | ❌ (Kecuali tugas) | ✅ Sesuai Shift Sendiri | ❌ |
+| Lapor Kejadian Non-SOS (Fasilitas Rusak, Lampu Mati, Sampah) | ✅ Pantau | ✅ Input Lapangan | ✅ Input Warga |
+| Aktivasi Tombol Darurat (SOS) + Notifikasi Sirine | ✅ | ✅ | ✅ |
+| Respons & Penyelesaian SOS (Scan QR Warga / Foto) | ✅ Verifikasi Foto | ✅ Respons Sesuai Dinas | 👁️ QR Pelapor |
+| Riwayat Audit Selesai SOS & Durasi Penanganan | ✅ Audit Lengkap | ✅ Riwayat Tugas | ✅ Transparansi RT |
+| Ekspor Laporan & Statistik Rekap Keamanan | ✅ Penuh (CSV/PDF) | ❌ | ❌ |
 
 ---
 
 ## 4. Spesifikasi Kebutuhan Fungsional (Functional Requirements)
 
 ### 4.1 Modul 1: Manajemen Akun, Profil, & Scope Lingkungan RT
-- **FR-AUTH-01**: Pengguna dapat masuk menggunakan Nomor WhatsApp / Email dan PIN/Password.
-- **FR-AUTH-02**: Akun terikat ke metadata wilayah: `rt_id`, `rw_id`, `nomor_rumah`, dan `role` (Admin RT, Petugas Ronda, Warga).
-- **FR-AUTH-03**: Pengguna dapat melihat identitas RT pengampu dan daftar kontak pengurus darurat lingkungan.
+- **FR-AUTH-01 (Autentikasi Kredensial & Proteksi Brute Force)**:
+  - Pengguna dapat masuk menggunakan Nomor WhatsApp terdaftar dan Password/PIN terenkripsi (SHA-256 + salt dinamis).
+  - **Rate Limiting**: Maksimal 5 kali percobaan login gagal berturut-turut. Percobaan ke-6 memicu penguncian akun sementara selama 15 menit (`ERR_AUTH_LOCKOUT`).
+- **FR-AUTH-02 (Scope Wilayah & RBAC)**:
+  - Akun terikat ke metadata wilayah: `rt_id`, `rw_id`, `nomor_rumah`, dan `role` (`adminRt`, `petugasRonda`, `warga`).
+  - Navigasi dan antarmuka beranda disesuaikan secara unik untuk masing-masing peran.
+- **FR-AUTH-03 (Informasi Pengurus & Kontak Darurat)**:
+  - Pengguna dapat melihat identitas RT pengampu dan daftar kontak pengurus darurat lingkungan.
 
-### 4.2 Modul 2: Penjadwalan Otomatis & Pertukaran Jadwal (Shift Swap)
-- **FR-SCHED-01**: Admin dapat men-generate jadwal ronda berkala (mingguan/bulanan) dengan mendistribusikan seluruh kepala keluarga/warga secara adil.
-- **FR-SCHED-02**: Notifikasi pengingat otomatis dikirim ke petugas: H-1 hari (19.00 WIB) dan H-2 jam sebelum ronda dimulai (21.00 WIB).
-- **FR-SCHED-03**: Warga yang bertugas dapat mengajukan pertukaran jadwal (*shift swap request*) ke warga lain dengan menyertakan alasan.
-- **FR-SCHED-04**: Jadwal resmi diperbarui otomatis setelah pihak penerima pertukaran dan Admin menyetujui.
+### 4.2 Modul 2: Penjadwalan Cerdas, Kalender Roster, & Shift Swap
+- **FR-SCHED-01 (Auto-Scheduler 5+1 & Manual Assign)**:
+  - Admin (Ketua RT) dapat menyusun jadwal otomatis untuk rentang 30 hari ke depan dengan aturan **5 Hari Ronda Aktif + 1 Hari Libur/Istirahat** per petugas.
+  - Pembagian shift: Shift Malam (22:00-04:00), Shift Sore (16:00-22:00), Shift Siang (08:00-16:00).
+  - Algoritma memprioritaskan minimal 1 petugas pada shift malam utama dan merotasi hari libur secara adil bagi seluruh personel aktif.
+  - Ketua RT dapat menugaskan petugas secara manual di tanggal dan shift tertentu.
+- **FR-SCHED-02 (Kalender Roster Terbuka & Transparan)**:
+  - Tersedia widget Kalender & Roster Jadwal Ronda interaktif di seluruh peran (**Ketua RT**, **Petugas Ronda**, dan **Warga**).
+  - Warga dapat memilih tanggal untuk memantau transparansi personel yang sedang dan akan bertugas mengamankan lingkungan mereka.
+- **FR-SCHED-03 (Pertukaran Shift Peer-to-Peer Consent & Anti-Konflik)**:
+  - Petugas dapat mengajukan tukar giliran dengan memilih rekan petugas pengganti, tanggal dinas target, jenis shift yang diambil, serta menyertakan alasan.
+  - **Alur Persetujuan Sah**: Berbasis *Peer-to-Peer Consent Langsung* (`pending` ➔ `acceptedByTarget` / `rejected`). Jadwal resmi bermutasi seketika saat rekan menyetujui, tanpa memerlukan tombol approval RT.
+  - **Tembusan & Override RT**: Ketua RT menerima tembusan notifikasi dan log audit mutasi real-time. Status `approvedByAdmin` disediakan khusus untuk intervensi administratif Ketua RT jika terjadi sengketa penugasan.
+  - **Single-Pending Constraint**: Satu jadwal dinas hanya boleh memiliki maksimal 1 permohonan tukar berstatus `pending` dalam satu waktu.
+  - **Batas Waktu Kedaluwarsa (Expiration SLA)**: Permohonan tukar yang belum direspons hingga **H-3 jam** sebelum jam mulai shift otomatis berstatus `expired` (kedaluwarsa) untuk mencegah kekosongan pos mendadak.
 
-### 4.3 Modul 3: Patroli & Validasi Checkpoint (QR Bertanda Waktu + GPS)
-- **FR-PATROL-01**: Admin menentukan titik checkpoint fisik di lingkungan (misal: Pos Utama, Gapura Gang 1, Gardu PLN, Area Lapangan) beserta koordinat koordinat GPS target dan toleransi radius (misal: 25 meter).
-- **FR-PATROL-02**: Aplikasi menyediakan pemindai QR Code bawaan (menggunakan kamera dari modul `ImageService` yang diperbarui).
-- **FR-PATROL-03 (Anti-Fraud / Anti-Spoofing)**: QR Code checkpoint berupa *dynamic token* atau bertanda waktu (HMAC terenkripsi berbasis waktu) yang dicegah dari pemalsuan foto cetak statis atau titip absen.
-- **FR-PATROL-04 (Geofencing Haversine)**: Saat QR dipindai, aplikasi memverifikasi lokasi GPS perangkat saat ini terhadap koordinat checkpoint:
-  $$\text{Jarak} = \text{haversine}(\text{lat}_{\text{user}}, \text{lon}_{\text{user}}, \text{lat}_{\text{target}}, \text{lon}_{\text{target}}) \le \text{Threshold (25m)}$$
-- **FR-PATROL-05**: Check-in berhasil akan merekam: `checkpoint_id`, `user_id`, `timestamp`, `lat_actual`, `lon_actual`, `accuracy`, dan status baterai perangkat.
+### 4.3 Modul 3: Patroli Checkpoint Fisik, Jadwal Jam Check-in, & Anti-Kecurangan
+- **FR-PATROL-01 (Jadwal Pos & Peringatan Check-in Bertahap)**:
+  - Setiap pos checkpoint fisik memiliki target jam check-in (misal Pos 1: 22:30 WIB, Pos 2: 23:30 WIB, Pos 3: 01:00 WIB, Pos 4: 02:30 WIB).
+  - Sistem mengevaluasi status dinamis pos berdasarkan jendela waktu pasti:
+    1. **`SEBELUM` (Mendatang)**: Waktu saat ini < `Target - 15 menit` (persiapan).
+    2. **`SAAT` (Waktunya Check-in)**: Berada dalam jendela waktu `Target - 15 menit` s/d `Target + 30 menit` (indikator amber menyala).
+    3. **`TERLEWAT` (Terlambat)**: Waktu saat ini > `Target + 30 menit` dan belum di-scan (indikator merah peringatan).
+    4. **`SELESAI` (Terverifikasi)**: Pos telah di-scan oleh petugas yang bersangkutan pada tanggal tersebut.
+  - **Manual Peringatan RT**: Ketua RT dapat mengirimkan sinyal pengingat manual via dasbor RT untuk pos yang belum dipindai.
+- **FR-PATROL-02 (Verifikasi Ganda: QR HMAC + Geofencing + Anti-Mock)**:
+  - **Mekanisme QR Pos Fisik**: Pos fisik ditempel stiker/papan QR berisi kode pos unik dan shared secret key. Kamera memindai kode dan membubuhkan stempel waktu lokal yang diverifikasi dengan window waktu maks 10 menit.
+  - **Validasi Radius Haversine**: Scan hanya diterima jika koordinat GPS pengguna berada dalam radius toleransi ($\le$ 25 meter) dari titik koordinat fisik pos, dengan akurasi GPS $\le$ 35 meter.
+  - **Deteksi Anti-Mock Location (GPS Spoofing)**: Sistem membaca flag `isMocked` dari penyedia lokasi perangkat. Jika terdeteksi Fake GPS, proses check-in langsung digagalkan dengan peringatan penolakan integritas.
+- **FR-PATROL-03 (Offline-First Queue di Area Blank Spot)**:
+  - Jika koneksi data terputus di sudut gelap RT, rekaman scan disimpan secara lokal dan disinkronkan otomatis saat sinyal pulih. Rekaman diverifikasi urutan stempel waktunya secara monotonik.
 
-### 4.4 Modul 4: Tombol Panik & Alarm Darurat (SOS Alert)
-- **FR-SOS-01**: Halaman utama memiliki tombol darurat besar yang memerlukan penekanan tahan (*long press* 3 detik) disertai *haptic vibration* untuk mencegah ketidaksengajaan.
-- **FR-SOS-02**: Saat terpicu, aplikasi langsung mengunci posisi GPS terkini dan memancarkan sinyal darurat ke backend API `/api/emergency/panic`.
-- **FR-SOS-03**: Backend memancarkan push notification FCM prioritas tinggi (*high-priority data payload*) ke topik RT terkait (`/topics/rt_<rt_id>_emergency`).
-- **FR-SOS-04**: Smartphone warga dan petugas ronda akan membunyikan nada alarm sirine darurat (bahkan saat mode hening/Do-Not-Disturb jika diizinkan sistem) serta membuka dialog pop-up yang memperlihatkan:
-  - Nama & alamat warga pelapor
-  - Titik lokasi darurat pada peta interaktif
-  - Tombol pintas navigasi ke lokasi (Google Maps Intent) dan tombol telepon langsung.
+### 4.4 Modul 4: Tombol Panik SOS, Real QR Scanner, & Broadcast Siaga
+- **FR-SOS-01 (Hak Respons Terbatas untuk Petugas Piket)**:
+  - Hanya petugas yang terjadwal aktif bertugas hari ini yang memiliki wewenang langsung merespons panggilan darurat warga.
+  - Petugas off-duty/cadangan yang ingin merespons harus mengonfirmasi pengaktifan *Mode Siaga Lapangan Darurat* (dialog konfirmasi eksplisit dengan pencatatan log audit).
+- **FR-SOS-02 (Pemindai QR Interaktif Real untuk Petugas)**:
+  - Petugas menggunakan modal pemindai QR kamera interaktif dengan animasi laser viewfinder, toggle senter kamera, deteksi instan layar QR warga pelapor, serta opsi foto kamera langsung.
+- **FR-SOS-03 (Siklus Verifikasi Multi-Status & Pembatalan False Alarm)**:
+  - **Alur Status Insiden**: `belumDitangani` ➔ `onGoing` ➔ `selesai` (via Scan QR Warga Pelapor) ATAU `menungguVerifikasiRt` (jika menggunakan Foto Bukti Lapangan).
+  - **Penolakan Foto oleh RT**: Jika Ketua RT menolak foto bukti penanganan (`isApproved = false`), status darurat dikembalikan ke `onGoing` disertai catatan penolakan RT untuk investigasi ulang petugas.
+  - **Pembatalan Mandiri Pelapor (Self-Cancellation)**: Jika warga tidak sengaja memicu alarm darurat (false alarm), warga pelapor dapat membatalkan insidennya sendiri selama status belum `selesai` dengan menyertakan alasan pembatalan.
+  - **Anti-Spam Debounce**: Tombol panik memiliki proteksi *debounce window* 15 detik untuk mencegah *flood request* dari penekanan panik berkali-kali.
+- **FR-SOS-04 (Panggilan Siaga / Broadcast Darurat Ketua RT)**:
+  - Ketua RT dapat mengirimkan siaran darurat (*Emergency Broadcast*) ke seluruh personel, baik yang sedang bertugas maupun yang sedang libur/cadangan, untuk segera merapat ke lokasi insiden.
 
 ### 4.5 Modul 5: Pencatatan Log Kejadian Lapangan & Kamera
-- **FR-LOG-01**: Petugas ronda dapat membuat laporan insiden mencurigakan selama berkeliling dengan memilih kategori (Pencurian, Keributan, Kebakaran, Orang Mencurigakan, Kerusakan Fasilitas, Lainnya).
-- **FR-LOG-02**: Laporan wajib menyertakan foto bukti langsung dari kamera (bukan galeri, untuk menjamin keaslian waktu nyata) menggunakan modul `ImageService` bawaan SensorLog.
-- **FR-LOG-03**: Laporan menyertakan koordinat GPS otomatis, waktu, catatan deskriptif, dan arah kompas perangkat saat membidik foto.
+- **FR-LOG-01**: Petugas ronda dan warga dapat membuat laporan insiden dengan memilih kategori (Pencurian, Keributan, Kebakaran, Orang Mencurigakan, Fasilitas Rusak, Lampu Mati, Sampah, Lainnya).
+- **FR-LOG-02 (Spesifikasi Media Foto)**: Laporan wajib menyertakan foto bukti langsung dari kamera (kompresi resolusi maks 1920x1080, JPEG 80%, batas ukuran $\le$ 2 MB per berkas).
+- **FR-LOG-03 (Graceful Fallback Sensor Kompas)**: Laporan menyertakan koordinat GPS otomatis, waktu, catatan, dan arah orientasi kompas. Jika perangkat tidak memiliki sensor magnetometer fisik, field `compass` bernilai `null` tanpa memblokir laporan.
 - **FR-LOG-04**: Admin dan warga dapat melihat feed laporan kejadian pada tab Linimasa Lingkungan.
 
 ### 4.6 Modul 6: Dukungan Offline-First (Patroli di Blank Spot)
-- **FR-OFFLINE-01**: Saat koneksi internet seluler terputus di sudut lingkungan, scan checkpoint dan laporan kejadian tetap dapat disimpan ke basis data lokal (SQLite / Hive).
+- **FR-OFFLINE-01**: Saat koneksi internet seluler terputus di sudut lingkungan, scan checkpoint dan laporan kejadian tetap dapat disimpan ke antrean lokal (`OfflineSyncQueue`).
 - **FR-OFFLINE-02**: Tanda waktu lokal kriptografis dicatat saat kejadian berlangsung.
-- **FR-OFFLINE-03**: Sinkronisasi otomatis (*background sync*) dijalankan segera setelah koneksi internet kembali pulih.
+- **FR-OFFLINE-03**: Sinkronisasi otomatis (*background sync*) dijalankan segera setelah koneksi internet kembali pulih tanpa duplikasi data (*idempotent insertion*).
+
+### 4.7 Modul 7: Peta Interaktif, Validasi Shift Individual, Peer Consent, & Laporan Warga
+- **FR-MAP-01 (Peta Interaktif Patroli OpenStreetMap & Geofence Pins)**:
+  - Seluruh role (Petugas, Ketua RT, Warga) memiliki widget peta interaktif patroli berbasis OpenStreetMap (`flutter_map`).
+  - Pos patroli ditampilkan sebagai pin interaktif dengan indikator status warna: Hijau (Selesai), Amber (Waktunya Scan), Merah (Terlewat / SOS), Biru (Mendatang).
+  - Terdapat lingkaran batas radius geofence (25–30m) di sekeliling tiap pos.
+  - Petugas dapat mengetuk pin pos untuk melihat jarak GPS live dan langsung memicu pemindaian QR Check-in.
+- **FR-SCHED-INDIVIDUAL (Validasi Check-in Per-Petugas Individual)**:
+  - Status pos patroli dievaluasi secara mandiri per-petugas (bukan kolektif). Jika satu petugas check-in, petugas lain yang bertugas tetap wajib melakukan check-in pada pos tersebut.
+  - Petugas dibatasi hanya dapat melakukan check-in di dalam jam shift dinasnya (`isTimeInShift`). Check-in di luar jam shift ditolak dengan pemberitahuan edukatif.
+- **FR-SWAP-PEER (Pertukaran Jadwal Peer-to-Peer Consent Tanpa Birokrasi RT)**:
+  - Pertukaran jadwal antar-petugas langsung bermutasi dan sah seketika setelah rekan yang dituju menyatakan persetujuan (`isAccepted: true`), tanpa memerlukan tombol approval dari Ketua RT.
+  - Ketua RT menerima notifikasi dan log audit mutasi jadwal transparan secara otomatis.
+  - Petugas memiliki section "Permintaan Tukar Jadwal (On-Going Requests)" untuk memantau permohonan masuk dan keluar.
+- **FR-CALENDAR-DYNAMIC (Kalender Dinamis & Shift Berselisihan / Overlap Handover)**:
+  - Penugasan jadwal manual oleh RT dan pemilihan rekan untuk tukar jadwal dilakukan via Kalender Dinamis visual yang menampilkan siapa saja yang bertugas pada tanggal tersebut.
+  - Sistem mengizinkan jadwal antar-petugas saling berselisihan/overlapping (misal: Devi 22.00–04.00, Jordi 02.00–08.00, Budi 16.00–23.00) demi serah terima patroli tanpa celah keamanan.
+  - Collision rule: Petugas yang sama tidak boleh memiliki shift yang bertabrakan waktu di hari yang sama.
+- **FR-CIVIC-REPORT (Laporan Non-SOS / Fasilitas Lingkungan oleh Warga)**:
+  - Warga dapat melaporkan masalah fasilitas umum non-darurat: lampu jalan mati, fasilitas umum rusak, tumpukan sampah, saluran air tersumbat, dll.
+  - Disertai foto bukti kamera, koordinat GPS otomatis, dan catatan detail untuk ditindaklanjuti pengurus RT dan petugas patroli.
+- **FR-SOS-AUDIT (Riwayat Audit Penanganan Darurat SOS Selesai)**:
+  - Seluruh insiden darurat yang telah berstatus `SELESAI` diarsipkan dalam Log Riwayat Audit SOS.
+  - Mencatat detail warga pelapor, waktu kejadian, petugas penangan, durasi tanggap, durasi penyelesaian, metode verifikasi (QR Warga vs Foto Bukti Terverifikasi RT), dan catatan penanganan.
+
+### 4.8 Modul 8: Integrasi Cloud Supabase & Sinkronisasi Real-Time
+- **FR-CLOUD-01 (Konektivitas Cloud Database Supabase)**:
+  - Menyediakan layanan cloud backend PostgreSQL di Supabase melalui `SupabaseRondaService` dan `SupabaseService`.
+  - Terintegrasi pada 9 tabel relasional utama: `rt_communities`, `users`, `checkpoints`, `patrol_schedules`, `shift_swaps`, `patrol_checkins`, `emergency_events`, `incident_reports`, dan `ronda_notifications`.
+- **FR-CLOUD-02 (Sinkronisasi Realtime Postgres Changes)**:
+  - Menggunakan publikasi `supabase_realtime` dengan stream listener pada `emergency_events`, `patrol_checkins`, `shift_swaps`, `patrol_schedules`, dan `ronda_notifications`.
+  - Perubahan data (seperti pemicuan SOS baru atau check-in pos) otomatis terdistribusi instan ke seluruh gawai petugas dan Ketua RT secara *live* tanpa *polling*.
+- **FR-CLOUD-03 (Arsitektur Ketahanan Offline Dual-Mode)**:
+  - Menggunakan fallback otomatis ke `MockBackend` dan antrean lokal `OfflineSyncQueue` jika perangkat mengalami blank spot atau koneksi internet terputus.
+  - Saat koneksi pulih, rekaman yang tersimpan di antrean offline secara otomatis disinkronkan ke Supabase Cloud dan diverifikasi integritasnya.
 
 ---
 
 ## 5. Kebutuhan Non-Fungsional (Non-Functional Requirements)
 
-| Aspek | Spesifikasi Kebutuhan |
+| Aspek | Spesifikasi Kebutuhan Terukur (SLA & Target QA) |
 | :--- | :--- |
-| **Latensi Notifikasi Darurat** | Pesan darurat SOS harus terdistribusi melalui FCM ke >95% gawai warga dalam waktu kurang dari **2,5 detik** dari penekanan tombol. |
-| **Toleransi Akurasi GPS** | Filter penolakan check-in jika nilai `accuracy` GPS > 35 meter (indikasi sinyal GPS lemah/spoofed mock location). |
-| **Efisiensi Baterai** | Pengambilan koordinat GPS menggunakan mode hemat daya (*balanced power accuracy*) di latar belakang, dan beralih ke *high accuracy* hanya saat proses pemindaian QR / pemicuan SOS. |
-| **Keamanan Data** | Seluruh komunikasi HTTP dilindungi TLS 1.3 / HTTPS. Autentikasi API menggunakan JSON Web Token (JWT) dengan umur masa aktif terukur. |
-| **Resiliensi Jaringan** | Mekanisme *idempotency key* pada pengiriman check-in agar tidak terjadi duplikasi log saat koneksi tidak stabil. |
+| **Latensi Notifikasi Darurat** | Pesan darurat SOS harus terdistribusi melalui Supabase Realtime WebSocket / FCM ke >95% gawai warga dalam waktu kurang dari **2,5 detik** dari penekanan tombol. |
+| **Toleransi Akurasi GPS & Anti-Mock** | Check-in ditolak mutlak jika nilai `accuracy` GPS > 35.0 meter ATAU properti `isMocked == true` (indikasi Fake GPS). |
+| **Efisiensi Baterai** | Konsumsi baterai latar belakang saat berpatroli aktif maksimum **3% per jam** dengan memanfaatkan pembacaan GPS pasif, dan beralih ke *high accuracy* hanya saat proses check-in / SOS. |
+| **Keamanan & Rate Limiting** | Sandi terenkripsi SHA-256 + salt dinamis. Pembatasan brute-force: akun terkunci selama **15 menit** setelah **5 kali percobaan salah berturut-turut** (`ERR_AUTH_LOCKOUT`). Komunikasi HTTP dilindungi TLS 1.3 / HTTPS. |
+| **Resiliensi Jaringan & Idempotensi** | Setiap pengiriman rekaman menggunakan *unique client UUID*. Duplikasi pengiriman pada jaringan tidak stabil ditolak secara elegan tanpa *duplicate record*. |
+| **Batas Media Foto** | Kompresi citra otomatis pada resolusi maksimum 1920x1080 piksel, format JPEG kualitas 80%, dengan batas ukuran berkas maksimum **2,0 MB**. |
 
 ---
 
 ## 6. Desain Arsitektur Teknis
 
-### 6.1 Arsitektur Sistem Terintegrasi
+### 6.1 Arsitektur Sistem Terintegrasi (Supabase Cloud + Dual-Mode Resilience)
 
 ```
-┌────────────────────────────────────────────────────────┐
-│            Aplikasi Mobile (Flutter Client)             │
-│  - Presentation: Beranda, Peta RT, Scan QR, SOS, Jadwal │
-│  - Providers: Auth, Patrol, Emergency, Schedule        │
-│  - Local Cache (Offline-First): SQLite / Hive          │
-│  - Services: Geolocator, Camera, SensorPlus, FCM Clt   │
-└───────────────▲────────────────────────▲───────────────┘
-                │ REST API (HTTPS)       │ WebSocket / FCM Topic
-                ▼                        ▼
-┌────────────────────────────────────────────────────────┐
-│            Backend Service (Node.js + Express)          │
-│  - Runtime: TypeScript + Express.js                    │
-│  - ORM: Prisma ORM                                     │
-│  - Engine Validasi: Time-based QR Verifier + Haversine │
-│  - Notifier: Firebase Admin SDK (FCM)                  │
-└───────────────────────────▲────────────────────────────┘
-                            │ Prisma Client
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│               Database Relasional (MySQL)               │
-│  - Users, RT_Profile, Checkpoints, Schedules,          │
-│  - Patrol_Logs, Incidents, Emergency_Events            │
-└────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Aplikasi Mobile (Flutter Client)                     │
+│  - Presentation Layer: Dashboard RT, Petugas Ronda, Warga, Peta OSM    │
+│  - State Management: RondaProvider (ChangeNotifier)                    │
+│  - Dual-Mode Resilience: MockBackend / OfflineSyncQueue (Offline-First)│
+│  - Device Services: Geolocator (Anti-Mock), Camera, SensorPlus         │
+└───────────────────▲────────────────────────────────▲───────────────────┘
+                    │ REST API (HTTPS / TLS 1.3)     │ Realtime WebSocket Stream
+                    ▼                                ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│               Cloud BaaS Service (Supabase Managed Cloud)              │
+│  - Authentication & Storage API                                        │
+│  - Realtime Publication Engine (postgres_changes broadcast)            │
+│  - RLS Policies & Encrypted Transport                                  │
+└───────────────────────────────────▲────────────────────────────────────┘
+                                    │ SQL Engine
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│               Database Relasional (PostgreSQL @ Supabase)              │
+│  - rt_communities, users, checkpoints, patrol_schedules, shift_swaps  │
+│  - patrol_checkins, emergency_events, incident_reports, notifications  │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 6.2 Skema Basis Data Relasional (MySQL + Prisma Schema)
+### 6.2 Skema Basis Data Relasional Cloud (PostgreSQL DDL)
 
-Berikut rancangan skema relasional pengganti schema lama SensorLog:
+Berikut rancangan 9 tabel relasional utama pada Supabase:
 
-```prisma
-datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
-}
+```sql
+-- 1. Komunitas RT/RW
+CREATE TABLE rt_communities (
+    id VARCHAR(50) PRIMARY KEY,
+    kode_rt VARCHAR(20) NOT NULL UNIQUE,
+    nama_wilayah VARCHAR(100) NOT NULL,
+    rw VARCHAR(20) NOT NULL,
+    kelurahan VARCHAR(100) NOT NULL,
+    kecamatan VARCHAR(100) NOT NULL,
+    kota VARCHAR(100) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-generator client {
-  provider = "prisma-client-js"
-}
+-- 2. Pengguna (Admin RT, Petugas Ronda, Warga)
+CREATE TABLE users (
+    id VARCHAR(50) PRIMARY KEY,
+    rt_id VARCHAR(50) REFERENCES rt_communities(id) ON DELETE CASCADE,
+    nama_lengkap VARCHAR(150) NOT NULL,
+    nomor_whatsapp VARCHAR(30) UNIQUE NOT NULL,
+    password_hash VARCHAR(100) NOT NULL,
+    alamat_rumah VARCHAR(200) NOT NULL,
+    role VARCHAR(30) NOT NULL,
+    fcm_token TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-enum Role {
-  ADMIN_RT
-  PETUGAS_RONDA
-  WARGA
-}
+-- 3. Titik Pos Checkpoint
+CREATE TABLE checkpoints (
+    id VARCHAR(50) PRIMARY KEY,
+    rt_id VARCHAR(50) REFERENCES rt_communities(id) ON DELETE CASCADE,
+    kode_titik VARCHAR(50) NOT NULL,
+    nama_lokasi VARCHAR(150) NOT NULL,
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    radius_meter DOUBLE PRECISION DEFAULT 25.0,
+    secret_key VARCHAR(100) NOT NULL,
+    target_waktu_checkin VARCHAR(10) DEFAULT '22:30',
+    window_menit_sebelum INT DEFAULT 15,
+    window_menit_setelah INT DEFAULT 30,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-enum IncidentCategory {
-  PENCURIAN
-  KEBAKARAN
-  KERIBUTAN
-  ORANG_MENCURIGAKAN
-  FASILITAS_RUSAK
-  LAINNYA
-}
+-- 4. Jadwal Patroli (Roster)
+CREATE TABLE patrol_schedules (
+    id VARCHAR(100) PRIMARY KEY,
+    rt_id VARCHAR(50) REFERENCES rt_communities(id) ON DELETE CASCADE,
+    user_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
+    petugas_name VARCHAR(150) NOT NULL,
+    tanggal_ronda TIMESTAMPTZ NOT NULL,
+    shift_name VARCHAR(100) NOT NULL,
+    jam_mulai VARCHAR(10) NOT NULL,
+    jam_selesai VARCHAR(10) NOT NULL,
+    is_completed BOOLEAN DEFAULT FALSE,
+    is_libur BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-enum SwapStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-  APPROVED_BY_ADMIN
-}
+-- 5. Pertukaran Jadwal (Shift Swap Peer-to-Peer)
+CREATE TABLE shift_swaps (
+    id VARCHAR(100) PRIMARY KEY,
+    schedule_id VARCHAR(100) REFERENCES patrol_schedules(id) ON DELETE CASCADE,
+    requester_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
+    requester_name VARCHAR(150) NOT NULL,
+    target_user_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
+    target_user_name VARCHAR(150) NOT NULL,
+    alasan TEXT NOT NULL,
+    requester_shift VARCHAR(100) NOT NULL,
+    target_date TIMESTAMPTZ,
+    target_shift VARCHAR(100) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-model RTCommunity {
-  id           String        @id @default(uuid())
-  nomorRt      String        @map("nomor_rt") // Contoh: "004"
-  nomorRw      String        @map("nomor_rw") // Contoh: "002"
-  kelurahan    String
-  users        User[]
-  checkpoints  Checkpoint[]
-  schedules    Schedule[]
-  incidents    Incident[]
-  emergencies  EmergencyEvent[]
+-- 6. Log Check-in Pos Patroli
+CREATE TABLE patrol_checkins (
+    id VARCHAR(100) PRIMARY KEY,
+    checkpoint_id VARCHAR(50) REFERENCES checkpoints(id) ON DELETE CASCADE,
+    user_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
+    scanned_at TIMESTAMPTZ NOT NULL,
+    latitude_user DOUBLE PRECISION NOT NULL,
+    longitude_user DOUBLE PRECISION NOT NULL,
+    distance_meter DOUBLE PRECISION NOT NULL,
+    accuracy DOUBLE PRECISION,
+    battery_level DOUBLE PRECISION,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-  createdAt    DateTime      @default(now()) @map("created_at")
+-- 7. Kejadian Darurat (SOS Emergency)
+CREATE TABLE emergency_events (
+    id VARCHAR(100) PRIMARY KEY,
+    rt_id VARCHAR(50) REFERENCES rt_communities(id) ON DELETE CASCADE,
+    user_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
+    user_name VARCHAR(150) NOT NULL,
+    user_address VARCHAR(200) NOT NULL,
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    catatan TEXT,
+    status VARCHAR(40) NOT NULL DEFAULT 'belumDitangani',
+    triggered_at TIMESTAMPTZ NOT NULL,
+    responded_at TIMESTAMPTZ,
+    responded_by_user_id VARCHAR(50),
+    responded_by_user_name VARCHAR(150),
+    resolved_at TIMESTAMPTZ,
+    resolved_via VARCHAR(30),
+    resolution_photo_path TEXT,
+    resolution_notes TEXT,
+    verification_qr_token VARCHAR(150) NOT NULL,
+    verified_by_admin_id VARCHAR(50),
+    admin_notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-  @@map("rt_communities")
-}
+-- 8. Laporan Kejadian & Fasilitas Rusak Non-SOS
+CREATE TABLE incident_reports (
+    id VARCHAR(100) PRIMARY KEY,
+    rt_id VARCHAR(50) REFERENCES rt_communities(id) ON DELETE CASCADE,
+    user_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
+    reporter_name VARCHAR(150) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    keterangan TEXT NOT NULL,
+    photo_path TEXT NOT NULL,
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    compass DOUBLE PRECISION,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-model User {
-  id              String        @id @default(uuid())
-  rtId            String        @map("rt_id")
-  rtCommunity     RTCommunity   @relation(fields: [rtId], references: [id], onDelete: Cascade)
-  namaLengkap     String        @map("nama_lengkap")
-  nomorWhatsapp   String        @unique @map("nomor_whatsapp")
-  passwordHash    String        @map("password_hash")
-  alamatRumah     String        @map("alamat_rumah")
-  role            Role          @default(WARGA)
-  fcmToken        String?       @map("fcm_token")
-  
-  schedulesAsDuty Schedule[]    @relation("DutyOfficer")
-  swapRequestsSent ShiftSwap[]  @relation("Requester")
-  swapRequestsRcvd ShiftSwap[]  @relation("TargetUser")
-  patrolLogs      PatrolLog[]
-  incidentsReported Incident[]
-  emergenciesTriggered EmergencyEvent[]
-
-  createdAt       DateTime      @default(now()) @map("created_at")
-
-  @@map("users")
-}
-
-model Checkpoint {
-  id          String      @id @default(uuid())
-  rtId        String      @map("rt_id")
-  rtCommunity RTCommunity @relation(fields: [rtId], references: [id], onDelete: Cascade)
-  kodeTitik   String      @map("kode_titik") // Contoh: "CP-POS-01"
-  namaLokasi  String      @map("nama_lokasi") // "Pos Ronda Barat"
-  latitude    Float
-  longitude   Float
-  radiusMeter Float       @default(25.0) @map("radius_meter")
-  qrSecretKey String      @map("qr_secret_key") // Untuk dynamic HMAC validation
-
-  patrolLogs  PatrolLog[]
-
-  createdAt   DateTime    @default(now()) @map("created_at")
-
-  @@map("checkpoints")
-}
-
-model Schedule {
-  id          String      @id @default(uuid())
-  rtId        String      @map("rt_id")
-  rtCommunity RTCommunity @relation(fields: [rtId], references: [id], onDelete: Cascade)
-  userId      String      @map("user_id")
-  petugas     User        @relation("DutyOfficer", fields: [userId], references: [id])
-  tanggalRonda DateTime   @map("tanggal_ronda") @db.Date
-  jamMulai    String      @default("22:00") @map("jam_mulai")
-  jamSelesai  String      @default("04:00") @map("jam_selesai")
-  isCompleted Boolean     @default(false) @map("is_completed")
-
-  swapRequests ShiftSwap[]
-
-  @@map("schedules")
-}
-
-model ShiftSwap {
-  id             String     @id @default(uuid())
-  scheduleId     String     @map("schedule_id")
-  schedule       Schedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  requesterId    String     @map("requester_id")
-  requester      User       @relation("Requester", fields: [requesterId], references: [id])
-  targetUserId   String     @map("target_user_id")
-  targetUser     User       @relation("TargetUser", fields: [targetUserId], references: [id])
-  alasan         String     @db.Text
-  status         SwapStatus @default(PENDING)
-  createdAt      DateTime   @default(now()) @map("created_at")
-
-  @@map("shift_swaps")
-}
-
-model PatrolLog {
-  id           String      @id @default(uuid())
-  checkpointId String      @map("checkpoint_id")
-  checkpoint   Checkpoint  @relation(fields: [checkpointId], references: [id])
-  userId       String      @map("user_id")
-  petugas      User        @relation(fields: [userId], references: [id])
-  scannedAt    DateTime    @default(now()) @map("scanned_at")
-  latitudeUser Float       @map("latitude_user")
-  longitudeUser Float      @map("longitude_user")
-  distanceMeter Float      @map("distance_meter")
-  batteryLevel Float?      @map("battery_level")
-  syncStatus   String      @default("SYNCED") @map("sync_status") // PENDING, SYNCED
-
-  @@map("patrol_logs")
-}
-
-model Incident {
-  id          String           @id @default(uuid())
-  rtId        String           @map("rt_id")
-  rtCommunity RTCommunity      @relation(fields: [rtId], references: [id], onDelete: Cascade)
-  userId      String           @map("user_id")
-  reporter    User             @relation(fields: [userId], references: [id])
-  category    IncidentCategory
-  keterangan  String           @db.Text
-  photoUrl    String           @map("photo_url")
-  latitude    Float
-  longitude   Float
-  compass     Float?
-  createdAt   DateTime         @default(now()) @map("created_at")
-
-  @@map("incidents")
-}
-
-model EmergencyEvent {
-  id          String      @id @default(uuid())
-  rtId        String      @map("rt_id")
-  rtCommunity RTCommunity @relation(fields: [rtId], references: [id], onDelete: Cascade)
-  userId      String      @map("user_id")
-  triggerBy   User        @relation(fields: [userId], references: [id])
-  latitude    Float
-  longitude   Float
-  catatan     String?     @db.Text
-  status      String      @default("ACTIVE") @map("status") // ACTIVE, RESOLVED
-  triggeredAt DateTime    @default(now()) @map("triggered_at")
-  resolvedAt  DateTime?   @map("resolved_at")
-
-  @@map("emergency_events")
-}
+-- 9. Notifikasi & Pengumuman RT
+CREATE TABLE ronda_notifications (
+    id VARCHAR(100) PRIMARY KEY,
+    rt_id VARCHAR(50) REFERENCES rt_communities(id) ON DELETE CASCADE,
+    title VARCHAR(200) NOT NULL,
+    body TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    target_user_id VARCHAR(50),
+    include_off_duty BOOLEAN DEFAULT FALSE,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
 ---
@@ -361,7 +395,7 @@ gantt
     title Roadmap Pengembangan Ronda Digital
     dateFormat  YYYY-MM-DD
     section Fase 1: MVP
-    Setup Database MySQL & Express API       :a1, 2026-11-15, 7d
+    Setup Database Supabase Cloud            :a1, 2026-11-15, 7d
     Refactor Auth & Role (Admin/Petugas/Warga):a2, after a1, 5d
     Modul Jadwal Ronda Dasar                 :a3, after a2, 5d
     Integrasi Pemindai QR Checkpoint         :a4, after a3, 6d
@@ -371,7 +405,7 @@ gantt
     Log Patroli & Feed Laporan Kejadian Berfoto :b3, after b2, 5d
     section Fase 3: Lanjutan & Uji Coba
     Validasi Jarak GPS (Haversine Formula)   :c1, after b3, 4d
-    Sinkronisasi Offline-First (Local Cache) :c2, after c1, 7d
+    Sinkronisasi Offline-First (Local Queue) :c2, after c1, 7d
     Pilot Uji Lapangan di 1 Lingkungan RT    :c3, after c2, 10d
 ```
 
@@ -433,13 +467,19 @@ Paket yang ditambahkan pada modul Flutter:
 
 1. **Efektivitas Ronda**:
    - 100% titik checkpoint wajib terpantau dan terverifikasi di dashboard Ketua RT setiap malam.
-   - Penurunan komplain jadwal terlupakan berkat notifikasi H-1 dan H-2 jam.
-2. **Keandalan Check-in**:
-   - Sistem menolak pemindaian QR jika jarak pengguna ke koordinat pos > 25 meter.
-   - Check-in tetap berhasil dicatat di storage lokal meski perangkat dalam kondisi Airplane Mode / No Service, dan tersinkronisasi dalam waktu < 10 detik setelah online.
-3. **Kecepatan Respon Darurat**:
-   - Waktu dari penekanan tombol SOS hingga sirine berbunyi di gawai warga rata-rata < 3 detik.
-   - Tingkat false-alarm mendekati 0% karena proteksi penekanan tahan 3 detik.
+   - 0 jadwal ganda (*schedule collisions*): Petugas yang sama tidak boleh memiliki shift bertabrakan pada hari yang sama.
+   - Status evaluasi pos teruji 100% konsisten terhadap jendela waktu: `SEBELUM` (T-15m), `SAAT` (T-15m s/d T+30m), `TERLEWAT` (T+30m), `SELESAI` (setelah scan).
+2. **Keandalan Check-in & Anti-Kecurangan**:
+   - Sistem menolak 100% pemindaian QR jika jarak pengguna ke koordinat pos > 25 meter.
+   - Sistem menolak 100% pemindaian QR jika perangkat terdeteksi mengaktifkan Mock Location (`isMocked == true`).
+   - Check-in offline 100% tersimpan di antrean lokal (`OfflineSyncQueue`) saat tidak ada sinyal, dan 100% rekaman tersinkronisasi dalam waktu < 10 detik setelah kembali online.
+3. **Kecepatan & Integritas Respon Darurat (SOS)**:
+   - Waktu dari penekanan tombol SOS hingga sirine dan pop-up darurat muncul di gawai warga < 2,5 detik pada koneksi internet standar.
+   - False-alarm akibat sentuhan tidak sengaja berdurasi < 3,0 detik adalah **0%** karena proteksi penekanan tahan minimum 3 detik.
+   - Pencegahan spamming: Penekanan berulang dalam 15 detik menghasilkan 0 event duplikat (terproteksi debounce window 15s).
+4. **Keamanan Autentikasi**:
+   - Akun terkunci tepat pada kegagalan login ke-6 (setelah 5 kali salah) dengan durasi lockout 15 menit (`ERR_AUTH_LOCKOUT`).
+   - Pertukaran jadwal kedaluwarsa otomatis tepat pada H-3 jam sebelum waktu shift dimulai.
 
 ---
 *PRD ini disusun sebagai acuan kerja implementasi teknis Kelompok 4 Teknik Komputer ITS dalam mentransformasikan SensorLog menjadi solusi nyata keamanan masyarakat.*

@@ -2,79 +2,62 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
-import 'core/config/env.dart';
-import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
-import 'data/repositories/auth_repository.dart';
-import 'data/repositories/record_repository.dart';
-import 'data/services/export_service.dart';
-import 'data/services/image_service.dart';
-import 'data/services/location_service.dart';
-import 'data/services/sensor_service.dart';
-import 'data/services/supabase_service.dart';
-import 'presentation/navigation/auth_gate.dart';
-import 'presentation/screens/setup/setup_required_screen.dart';
-import 'providers/auth_provider.dart';
-import 'providers/records_provider.dart';
+import 'domain/ronda/models/ronda_models.dart';
+import 'presentation/screens/auth/ronda_login_screen.dart';
+import 'presentation/screens/ronda/admin_rt_dashboard.dart';
+import 'presentation/screens/ronda/petugas_ronda_dashboard.dart';
+import 'presentation/screens/ronda/warga_dashboard.dart';
+import 'providers/ronda_provider.dart';
 
-class SensorLogApp extends StatelessWidget {
-  const SensorLogApp({super.key, this.startupError});
-
-  /// Pesan error jika inisialisasi Supabase gagal saat startup.
-  final String? startupError;
+class RondaDigitalApp extends StatelessWidget {
+  const RondaDigitalApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final ready = Env.isConfigured && startupError == null;
-    final app = MaterialApp(
-      title: AppConstants.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
-      locale: const Locale('id', 'ID'),
-      supportedLocales: const [Locale('id', 'ID'), Locale('en')],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      home: ready
-          ? const AuthGate()
-          : SetupRequiredScreen(
-              title: startupError == null ? null : 'Gagal terhubung ke Supabase',
-              message: startupError,
-            ),
+    return ChangeNotifierProvider(
+      create: (_) => RondaProvider(),
+      child: MaterialApp(
+        title: 'Ronda Digital - Siskamling Modern',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: ThemeMode.system,
+        locale: const Locale('id', 'ID'),
+        supportedLocales: const [Locale('id', 'ID'), Locale('en')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: const _RoleRouterGate(),
+      ),
     );
-    // Provider harus berada DI ATAS MaterialApp agar layar yang di-push
-    // (Catat, Detail, Akun) tetap bisa mengaksesnya.
-    return ready ? _AppScope(child: app) : app;
   }
 }
 
-/// Menyediakan service, repository, dan provider global.
-class _AppScope extends StatelessWidget {
-  const _AppScope({required this.child});
-  final Widget child;
+/// Gate Pengarah Antarmuka Berdasarkan Status Autentikasi dan Peran (RBAC)
+class _RoleRouterGate extends StatelessWidget {
+  const _RoleRouterGate();
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        Provider(create: (_) => LocationService()),
-        Provider(create: (_) => SensorService()),
-        Provider(create: (_) => ImageService()),
-        Provider(create: (_) => ExportService()),
-        Provider(create: (_) => AuthRepository(SupabaseService.client)),
-        Provider(create: (_) => RecordRepository(SupabaseService.client)),
-        ChangeNotifierProvider(create: (c) => AuthProvider(c.read<AuthRepository>())),
-        // Data catatan mengikuti akun yang sedang masuk (dikosongkan saat keluar/ganti akun).
-        ChangeNotifierProxyProvider<AuthProvider, RecordsProvider>(
-          create: (c) => RecordsProvider(c.read<RecordRepository>()),
-          update: (_, auth, records) => records!..onUserChanged(auth.user?.id),
-        ),
-      ],
-      child: child,
-    );
+    final ronda = context.watch<RondaProvider>();
+    final user = ronda.currentUser;
+
+    // 1. Jika belum login, tampilkan layar masuk resmi terenkripsi
+    if (user == null) {
+      return const RondaLoginScreen();
+    }
+
+    // 2. Jika sudah terautentikasi, alihkan ke tampilan utama yang disesuaikan per peran
+    switch (user.role) {
+      case UserRole.adminRt:
+        return const AdminRtDashboard();
+      case UserRole.petugasRonda:
+        return const PetugasRondaDashboard();
+      case UserRole.warga:
+        return const WargaDashboard();
+    }
   }
 }

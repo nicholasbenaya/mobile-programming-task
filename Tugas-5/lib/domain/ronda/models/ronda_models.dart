@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:latlong2/latlong.dart';
 
 /// Peran Pengguna pada Ekosistem Ronda Digital (RBAC)
@@ -33,13 +35,86 @@ enum UserRole {
   }
 }
 
-/// Kategori Insiden / Temuan Patroli
+/// Siklus Status Insiden Darurat (SOS Lifecycle)
+enum EmergencyStatus {
+  belumDitangani,
+  onGoing,
+  menungguVerifikasiRt,
+  selesai;
+
+  String get label {
+    switch (this) {
+      case EmergencyStatus.belumDitangani:
+        return 'Belum Ditangani (Menunggu Respons)';
+      case EmergencyStatus.onGoing:
+        return 'Sedang Direspons Petugas';
+      case EmergencyStatus.menungguVerifikasiRt:
+        return 'Menunggu Verifikasi RT (Bukti Foto)';
+      case EmergencyStatus.selesai:
+        return 'Selesai / Tertangani';
+    }
+  }
+
+  static EmergencyStatus fromString(String value) {
+    switch (value.toUpperCase()) {
+      case 'BELUM_DITANGANI':
+      case 'BELUMDITANGANI':
+      case 'ACTIVE':
+        return EmergencyStatus.belumDitangani;
+      case 'ON_GOING':
+      case 'ONGOING':
+        return EmergencyStatus.onGoing;
+      case 'MENUNGGU_VERIFIKASI_RT':
+      case 'MENUNGGUVERIFIKASIRT':
+      case 'WAITING_RT':
+        return EmergencyStatus.menungguVerifikasiRt;
+      case 'SELESAI':
+      case 'DONE':
+      case 'RESOLVED':
+      default:
+        return EmergencyStatus.selesai;
+    }
+  }
+}
+
+/// Metode Penyelesaian Insiden Darurat
+enum EmergencyResolutionType {
+  qrWarga,
+  fotoBukti;
+
+  String get label {
+    switch (this) {
+      case EmergencyResolutionType.qrWarga:
+        return 'Scan QR Warga Pelapor (Otomatis Selesai)';
+      case EmergencyResolutionType.fotoBukti:
+        return 'Foto Bukti Lapangan (Perlu Verifikasi RT)';
+    }
+  }
+
+  static EmergencyResolutionType? fromString(String? value) {
+    if (value == null) return null;
+    switch (value.toUpperCase()) {
+      case 'QR_WARGA':
+      case 'QRWARGA':
+        return EmergencyResolutionType.qrWarga;
+      case 'FOTO_BUKTI':
+      case 'FOTOBUKTI':
+        return EmergencyResolutionType.fotoBukti;
+      default:
+        return null;
+    }
+  }
+}
+
+/// Kategori Insiden / Temuan Patroli & Laporan Warga
 enum IncidentCategory {
   pencurian,
   kebakaran,
   keributan,
   orangMencurigakan,
   fasilitasRusak,
+  lampuMati,
+  sampah,
   lainnya;
 
   String get label {
@@ -49,34 +124,40 @@ enum IncidentCategory {
       case IncidentCategory.kebakaran:
         return 'Kebakaran / Korsleting';
       case IncidentCategory.keributan:
-        return 'Keributan / Tawuran';
+        return 'Keributan / Gangguan Ketertiban';
       case IncidentCategory.orangMencurigakan:
         return 'Orang Mencurigakan';
       case IncidentCategory.fasilitasRusak:
-        return 'Kerusakan Fasilitas Umum';
+        return 'Kerusakan Fasilitas Umum (Portal/Gapura/Jalan)';
+      case IncidentCategory.lampuMati:
+        return 'Lampu Jalan / Lingkungan Padam';
+      case IncidentCategory.sampah:
+        return 'Sampah Menumpuk / Saluran Tersumbat';
       case IncidentCategory.lainnya:
-        return 'Lainnya';
+        return 'Lainnya / Keluhan Umum';
     }
   }
 }
 
-/// Status Pengajuan Pertukaran Jadwal (Shift Swap State Machine)
+/// Status Pengajuan Pertukaran Jadwal (Shift Swap)
 enum ShiftSwapStatus {
   pending,
   acceptedByTarget,
   rejected,
-  approvedByAdmin;
+  approvedByAdmin,
+  expired;
 
   String get label {
     switch (this) {
       case ShiftSwapStatus.pending:
-        return 'Menunggu Persetujuan Pengganti';
+        return 'Menunggu Persetujuan Rekan';
       case ShiftSwapStatus.acceptedByTarget:
-        return 'Disetujui Pengganti (Menunggu Ketua RT)';
-      case ShiftSwapStatus.rejected:
-        return 'Ditolak';
       case ShiftSwapStatus.approvedByAdmin:
-        return 'Resmi Disetujui (Jadwal Berpindah)';
+        return 'Disetujui Bersama (Jadwal Resmi Berpindah)';
+      case ShiftSwapStatus.rejected:
+        return 'Ditolak Rekan';
+      case ShiftSwapStatus.expired:
+        return 'Kedaluwarsa (Lewat Batas Waktu H-3 Jam)';
     }
   }
 }
@@ -89,7 +170,7 @@ enum SyncStatus {
   failed;
 }
 
-/// Entitas Pengguna
+/// Entitas Pengguna Terenkripsi (RBAC)
 class RondaUser {
   const RondaUser({
     required this.id,
@@ -99,6 +180,8 @@ class RondaUser {
     required this.alamatRumah,
     required this.role,
     this.fcmToken,
+    this.passwordHash = '',
+    this.salt = 'ronda_salt_its_kelompok_4',
   });
 
   final String id;
@@ -108,6 +191,21 @@ class RondaUser {
   final String alamatRumah;
   final UserRole role;
   final String? fcmToken;
+  final String passwordHash;
+  final String salt;
+
+  /// Algoritma Hashing SHA-256 Ber-Salt untuk Keamanan Kredensial
+  static String hashPassword(String password, [String salt = 'ronda_salt_its_kelompok_4']) {
+    final bytes = utf8.encode(password + salt);
+    return sha256.convert(bytes).toString();
+  }
+
+  /// Verifikasi kecocokan sandi pengguna
+  bool verifyPassword(String inputPassword) {
+    if (passwordHash.isEmpty) return true; // Fallback jika belum di-hash
+    final computed = hashPassword(inputPassword, salt);
+    return computed == passwordHash;
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -117,6 +215,8 @@ class RondaUser {
         'alamat_rumah': alamatRumah,
         'role': role.name,
         'fcm_token': fcmToken,
+        'password_hash': passwordHash,
+        'salt': salt,
       };
 
   factory RondaUser.fromJson(Map<String, dynamic> json) => RondaUser(
@@ -127,10 +227,33 @@ class RondaUser {
         alamatRumah: json['alamat_rumah'] as String,
         role: UserRole.fromString(json['role'] as String),
         fcmToken: json['fcm_token'] as String?,
+        passwordHash: json['password_hash'] as String? ?? '',
+        salt: json['salt'] as String? ?? 'ronda_salt_its_kelompok_4',
       );
 }
 
-/// Entitas Titik Checkpoint Pos Patroli
+/// Status Jadwal Patroli Pos Checkpoint
+enum CheckpointScheduleStatus {
+  sebelum,
+  saat,
+  terlewat,
+  selesai;
+
+  String get label {
+    switch (this) {
+      case CheckpointScheduleStatus.sebelum:
+        return 'Mendatang (Persiapan)';
+      case CheckpointScheduleStatus.saat:
+        return 'WAKTUNYA CHECK-IN!';
+      case CheckpointScheduleStatus.terlewat:
+        return 'TERLEWAT (Belum Scan)';
+      case CheckpointScheduleStatus.selesai:
+        return 'Selesai Terverifikasi';
+    }
+  }
+}
+
+/// Entitas Titik Checkpoint Pos Patroli Fisik
 class Checkpoint {
   const Checkpoint({
     required this.id,
@@ -141,6 +264,9 @@ class Checkpoint {
     required this.longitude,
     this.radiusMeter = 25.0,
     required this.secretKey,
+    this.targetWaktuCheckin = '22:30',
+    this.windowMenitSebelum = 15,
+    this.windowMenitSetelah = 30,
   });
 
   final String id;
@@ -151,8 +277,38 @@ class Checkpoint {
   final double longitude;
   final double radiusMeter;
   final String secretKey;
+  final String targetWaktuCheckin;
+  final int windowMenitSebelum;
+  final int windowMenitSetelah;
 
   LatLng get coordinates => LatLng(latitude, longitude);
+
+  /// Menghitung status jadwal checkpoint relatif terhadap jam patroli saat ini
+  CheckpointScheduleStatus calculateStatus({
+    DateTime? currentTime,
+    bool hasCheckedIn = false,
+    String? customTargetTime,
+  }) {
+    if (hasCheckedIn) return CheckpointScheduleStatus.selesai;
+
+    final now = currentTime ?? DateTime.now();
+    final timeStr = customTargetTime ?? targetWaktuCheckin;
+    final parts = timeStr.split(':');
+    final targetHour = int.tryParse(parts[0]) ?? 22;
+    final targetMinute = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+
+    final targetDateTime = DateTime(now.year, now.month, now.day, targetHour, targetMinute);
+    final windowStart = targetDateTime.subtract(Duration(minutes: windowMenitSebelum));
+    final windowEnd = targetDateTime.add(Duration(minutes: windowMenitSetelah));
+
+    if (now.isBefore(windowStart)) {
+      return CheckpointScheduleStatus.sebelum;
+    } else if (now.isAfter(windowEnd)) {
+      return CheckpointScheduleStatus.terlewat;
+    } else {
+      return CheckpointScheduleStatus.saat;
+    }
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -163,6 +319,9 @@ class Checkpoint {
         'longitude': longitude,
         'radius_meter': radiusMeter,
         'secret_key': secretKey,
+        'target_waktu_checkin': targetWaktuCheckin,
+        'window_menit_sebelum': windowMenitSebelum,
+        'window_menit_setelah': windowMenitSetelah,
       };
 
   factory Checkpoint.fromJson(Map<String, dynamic> json) => Checkpoint(
@@ -174,6 +333,9 @@ class Checkpoint {
         longitude: (json['longitude'] as num).toDouble(),
         radiusMeter: (json['radius_meter'] as num?)?.toDouble() ?? 25.0,
         secretKey: json['secret_key'] as String,
+        targetWaktuCheckin: json['target_waktu_checkin'] as String? ?? '22:30',
+        windowMenitSebelum: (json['window_menit_sebelum'] as num?)?.toInt() ?? 15,
+        windowMenitSetelah: (json['window_menit_setelah'] as num?)?.toInt() ?? 30,
       );
 }
 
@@ -241,9 +403,11 @@ class PatrolSchedule {
     required this.userId,
     required this.petugasName,
     required this.tanggalRonda,
+    this.shiftName = 'Shift Malam (22:00 - 04:00)',
     this.jamMulai = '22:00',
     this.jamSelesai = '04:00',
     this.isCompleted = false,
+    this.isLibur = false,
   });
 
   final String id;
@@ -251,9 +415,62 @@ class PatrolSchedule {
   String userId;
   String petugasName;
   final DateTime tanggalRonda;
+  final String shiftName;
   final String jamMulai;
   final String jamSelesai;
   bool isCompleted;
+  bool isLibur;
+
+  /// Waktu pasti dimulainya dinas shift ini
+  DateTime get startDateTime {
+    final parts = jamMulai.split(':');
+    final h = int.tryParse(parts[0]) ?? 22;
+    final m = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+    return DateTime(tanggalRonda.year, tanggalRonda.month, tanggalRonda.day, h, m);
+  }
+
+  /// Memeriksa apakah waktu tertentu berada dalam rentang shift ini
+  bool isTimeInShift(DateTime time) {
+    if (isLibur) return false;
+    final startParts = jamMulai.split(':');
+    final endParts = jamSelesai.split(':');
+    final sH = int.tryParse(startParts[0]) ?? 22;
+    final sM = int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0;
+    final eH = int.tryParse(endParts[0]) ?? 4;
+    final eM = int.tryParse(endParts.length > 1 ? endParts[1] : '0') ?? 0;
+
+    final startMinutes = sH * 60 + sM;
+    final endMinutes = eH * 60 + eM;
+    final currentMinutes = time.hour * 60 + time.minute;
+
+    if (startMinutes <= endMinutes) {
+      // Shift normal dalam 1 hari kalender (misal 16:00 - 22:00 atau 08:00 - 16:00)
+      return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+    } else {
+      // Shift malam melintasi tengah malam (misal 22:00 - 04:00)
+      return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+    }
+  }
+
+  /// Menghasilkan target jam checkpoint proporsional khusus shift ini
+  String getTargetTimeForCheckpoint(int cpIndex, int totalCheckpoints) {
+    final startParts = jamMulai.split(':');
+    final endParts = jamSelesai.split(':');
+    final sH = int.tryParse(startParts[0]) ?? 22;
+    final sM = int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0;
+    var eH = int.tryParse(endParts[0]) ?? 4;
+    final eM = int.tryParse(endParts.length > 1 ? endParts[1] : '0') ?? 0;
+    if (eH <= sH) eH += 24;
+
+    final startMin = sH * 60 + sM;
+    final endMin = eH * 60 + eM;
+    final duration = endMin - startMin;
+
+    final offsetMin = startMin + ((duration * (cpIndex + 1)) ~/ (totalCheckpoints + 1));
+    final normalizedHour = (offsetMin ~/ 60) % 24;
+    final normalizedMin = offsetMin % 60;
+    return '${normalizedHour.toString().padLeft(2, '0')}:${normalizedMin.toString().padLeft(2, '0')}';
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -261,9 +478,11 @@ class PatrolSchedule {
         'user_id': userId,
         'petugas_name': petugasName,
         'tanggal_ronda': tanggalRonda.toIso8601String(),
+        'shift_name': shiftName,
         'jam_mulai': jamMulai,
         'jam_selesai': jamSelesai,
         'is_completed': isCompleted,
+        'is_libur': isLibur,
       };
 
   factory PatrolSchedule.fromJson(Map<String, dynamic> json) => PatrolSchedule(
@@ -272,9 +491,11 @@ class PatrolSchedule {
         userId: json['user_id'] as String,
         petugasName: json['petugas_name'] as String,
         tanggalRonda: DateTime.parse(json['tanggal_ronda'] as String),
+        shiftName: json['shift_name'] as String? ?? 'Shift Malam (22:00 - 04:00)',
         jamMulai: json['jam_mulai'] as String? ?? '22:00',
         jamSelesai: json['jam_selesai'] as String? ?? '04:00',
         isCompleted: json['is_completed'] as bool? ?? false,
+        isLibur: json['is_libur'] as bool? ?? false,
       );
 }
 
@@ -288,6 +509,9 @@ class ShiftSwapRequest {
     required this.targetUserId,
     required this.targetUserName,
     required this.alasan,
+    this.requesterShift = 'Shift Malam',
+    this.targetDate,
+    this.targetShift = 'Shift Malam',
     this.status = ShiftSwapStatus.pending,
     required this.createdAt,
   });
@@ -299,6 +523,9 @@ class ShiftSwapRequest {
   final String targetUserId;
   final String targetUserName;
   final String alasan;
+  final String requesterShift;
+  final DateTime? targetDate;
+  final String targetShift;
   ShiftSwapStatus status;
   final DateTime createdAt;
 
@@ -310,6 +537,9 @@ class ShiftSwapRequest {
         'target_user_id': targetUserId,
         'target_user_name': targetUserName,
         'alasan': alasan,
+        'requester_shift': requesterShift,
+        'target_date': targetDate?.toIso8601String(),
+        'target_shift': targetShift,
         'status': status.name,
         'created_at': createdAt.toIso8601String(),
       };
@@ -322,6 +552,9 @@ class ShiftSwapRequest {
         targetUserId: json['target_user_id'] as String,
         targetUserName: json['target_user_name'] as String,
         alasan: json['alasan'] as String,
+        requesterShift: json['requester_shift'] as String? ?? 'Shift Malam',
+        targetDate: json['target_date'] != null ? DateTime.parse(json['target_date'] as String) : null,
+        targetShift: json['target_shift'] as String? ?? 'Shift Malam',
         status: ShiftSwapStatus.values.firstWhere(
           (s) => s.name == json['status'],
           orElse: () => ShiftSwapStatus.pending,
@@ -330,7 +563,64 @@ class ShiftSwapRequest {
       );
 }
 
-/// Entitas Notifikasi & Kejadian Darurat (SOS)
+/// Tipe Notifikasi Ekosistem Ronda Digital
+enum RondaNotificationType {
+  sosEmergency,
+  checkpointReminder,
+  scheduleUpdate,
+  systemAlert;
+}
+
+/// Entitas Notifikasi Internal Sistem
+class RondaNotification {
+  const RondaNotification({
+    required this.id,
+    required this.rtId,
+    required this.title,
+    required this.body,
+    required this.type,
+    this.targetUserId,
+    this.includeOffDuty = false,
+    required this.createdAt,
+    this.isRead = false,
+  });
+
+  final String id;
+  final String rtId;
+  final String title;
+  final String body;
+  final RondaNotificationType type;
+  final String? targetUserId;
+  final bool includeOffDuty;
+  final DateTime createdAt;
+  final bool isRead;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'rt_id': rtId,
+        'title': title,
+        'body': body,
+        'type': type.name,
+        'target_user_id': targetUserId,
+        'include_off_duty': includeOffDuty,
+        'created_at': createdAt.toIso8601String(),
+        'is_read': isRead,
+      };
+
+  factory RondaNotification.fromJson(Map<String, dynamic> json) => RondaNotification(
+        id: json['id'] as String,
+        rtId: json['rt_id'] as String,
+        title: json['title'] as String,
+        body: json['body'] as String,
+        type: RondaNotificationType.values.firstWhere((t) => t.name == json['type']),
+        targetUserId: json['target_user_id'] as String?,
+        includeOffDuty: json['include_off_duty'] as bool? ?? false,
+        createdAt: DateTime.parse(json['created_at'] as String),
+        isRead: json['is_read'] as bool? ?? false,
+      );
+}
+
+/// Entitas Notifikasi & Kejadian Darurat (SOS) dengan Siklus Multi-Status
 class EmergencyEvent {
   EmergencyEvent({
     required this.id,
@@ -341,10 +631,19 @@ class EmergencyEvent {
     required this.latitude,
     required this.longitude,
     this.catatan,
-    this.status = 'ACTIVE',
+    this.status = EmergencyStatus.belumDitangani,
     required this.triggeredAt,
+    this.respondedAt,
+    this.respondedByUserId,
+    this.respondedByUserName,
     this.resolvedAt,
-  });
+    this.resolvedVia,
+    this.resolutionPhotoPath,
+    this.resolutionNotes,
+    String? verificationQrToken,
+    this.verifiedByAdminId,
+    this.adminNotes,
+  }) : verificationQrToken = verificationQrToken ?? 'QR-SOS-VERIFY-$id-$userId';
 
   final String id;
   final String rtId;
@@ -354,11 +653,27 @@ class EmergencyEvent {
   final double latitude;
   final double longitude;
   final String? catatan;
-  String status;
+  EmergencyStatus status;
   final DateTime triggeredAt;
+  DateTime? respondedAt;
+  String? respondedByUserId;
+  String? respondedByUserName;
   DateTime? resolvedAt;
+  EmergencyResolutionType? resolvedVia;
+  String? resolutionPhotoPath;
+  String? resolutionNotes;
+  final String verificationQrToken;
+  String? verifiedByAdminId;
+  String? adminNotes;
 
-  bool get isActive => status == 'ACTIVE';
+  bool get isActive => status != EmergencyStatus.selesai;
+  bool get isBelumDitangani => status == EmergencyStatus.belumDitangani;
+  bool get isOnGoing => status == EmergencyStatus.onGoing;
+  bool get isMenungguVerifikasiRt => status == EmergencyStatus.menungguVerifikasiRt;
+  bool get isSelesai => status == EmergencyStatus.selesai;
+
+  Duration? get durationToResolve => resolvedAt?.difference(triggeredAt);
+  Duration? get durationToRespond => respondedAt?.difference(triggeredAt);
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -369,9 +684,18 @@ class EmergencyEvent {
         'latitude': latitude,
         'longitude': longitude,
         'catatan': catatan,
-        'status': status,
+        'status': status.name,
         'triggered_at': triggeredAt.toIso8601String(),
+        'responded_at': respondedAt?.toIso8601String(),
+        'responded_by_user_id': respondedByUserId,
+        'responded_by_user_name': respondedByUserName,
         'resolved_at': resolvedAt?.toIso8601String(),
+        'resolved_via': resolvedVia?.name,
+        'resolution_photo_path': resolutionPhotoPath,
+        'resolution_notes': resolutionNotes,
+        'verification_qr_token': verificationQrToken,
+        'verified_by_admin_id': verifiedByAdminId,
+        'admin_notes': adminNotes,
       };
 
   factory EmergencyEvent.fromJson(Map<String, dynamic> json) => EmergencyEvent(
@@ -383,9 +707,18 @@ class EmergencyEvent {
         latitude: (json['latitude'] as num).toDouble(),
         longitude: (json['longitude'] as num).toDouble(),
         catatan: json['catatan'] as String?,
-        status: json['status'] as String? ?? 'ACTIVE',
+        status: EmergencyStatus.fromString(json['status'] as String? ?? 'BELUM_DITANGANI'),
         triggeredAt: DateTime.parse(json['triggered_at'] as String),
+        respondedAt: json['responded_at'] != null ? DateTime.parse(json['responded_at'] as String) : null,
+        respondedByUserId: json['responded_by_user_id'] as String?,
+        respondedByUserName: json['responded_by_user_name'] as String?,
         resolvedAt: json['resolved_at'] != null ? DateTime.parse(json['resolved_at'] as String) : null,
+        resolvedVia: EmergencyResolutionType.fromString(json['resolved_via'] as String?),
+        resolutionPhotoPath: json['resolution_photo_path'] as String?,
+        resolutionNotes: json['resolution_notes'] as String?,
+        verificationQrToken: json['verification_qr_token'] as String?,
+        verifiedByAdminId: json['verified_by_admin_id'] as String?,
+        adminNotes: json['admin_notes'] as String?,
       );
 }
 

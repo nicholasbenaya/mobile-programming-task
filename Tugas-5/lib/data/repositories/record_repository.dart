@@ -36,6 +36,7 @@ class RecordRepository {
       if (rows.isEmpty) return [];
 
       final paths = [for (final m in rows) m['photo_path'] as String];
+      // ignore: deprecated_member_use
       final signed = await _bucket.createSignedUrls(paths, _urlTtlSeconds);
 
       return [

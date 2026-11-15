@@ -5,7 +5,7 @@ class Env {
   const Env._();
 
   /// URL dibersihkan otomatis: spasi, garis miring di akhir, dan path
-  /// tambahan (mis. /rest/v1) dibuang supaya hanya https://<ref>.supabase.co.
+  /// tambahan (mis. /rest/v1) dibuang supaya hanya `https://<ref>.supabase.co`.
   static String get supabaseUrl {
     final raw = Secrets.supabaseUrl.trim();
     final uri = Uri.tryParse(raw);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/ronda/models/ronda_models.dart';
@@ -10,6 +11,7 @@ import 'widgets/dynamic_roster_calendar_dialog.dart';
 import 'widgets/patrol_calendar_widget.dart';
 import 'widgets/patrol_interactive_map.dart';
 import 'widgets/sos_qr_scanner_dialog.dart';
+import 'package:image_picker/image_picker.dart';
 
 /// Dasbor Utama Khusus Petugas Ronda: Fokus pada Tugas Patroli, Scan Pos Fisik & Respons Darurat SOS
 class PetugasRondaDashboard extends StatelessWidget {
@@ -869,21 +871,28 @@ class PetugasRondaDashboard extends StatelessWidget {
   }
 
   void _showReportIncidentDialog(BuildContext context, RondaProvider ronda) {
-    final noteController = TextEditingController();
-    IncidentCategory selectedCat = IncidentCategory.orangMencurigakan;
+  final noteController = TextEditingController();
+  IncidentCategory selectedCat = IncidentCategory.orangMencurigakan;
+  XFile? photo;
+  final picker = ImagePicker();
 
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Lapor Temuan Insiden Patroli'),
-          content: Column(
+  showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        title: const Text('Lapor Temuan Insiden Patroli'),
+        content: SingleChildScrollView(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               DropdownButtonFormField<IncidentCategory>(
                 initialValue: selectedCat,
-                items: IncidentCategory.values.map((c) => DropdownMenuItem(value: c, child: Text(c.label, style: const TextStyle(fontSize: 13)))).toList(),
+                items: IncidentCategory.values
+                    .map((c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(c.label, style: const TextStyle(fontSize: 13))))
+                    .toList(),
                 onChanged: (val) {
                   if (val != null) setDialogState(() => selectedCat = val);
                 },
@@ -895,27 +904,47 @@ class PetugasRondaDashboard extends StatelessWidget {
                 decoration: const InputDecoration(labelText: 'Keterangan Temuan'),
                 maxLines: 2,
               ),
+              const SizedBox(height: 12),
+              if (photo != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(File(photo!.path), height: 120, fit: BoxFit.cover),
+                ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.camera_alt),
+                label: Text(photo == null ? 'Ambil Foto' : 'Ambil Ulang'),
+                onPressed: () async {
+                  final picked = await picker.pickImage(
+                    source: ImageSource.camera,
+                    imageQuality: 70,
+                  );
+                  if (picked != null) setDialogState(() => photo = picked);
+                },
+              ),
             ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
-              onPressed: () {
-                Navigator.pop(ctx);
-                ronda.reportIncident(
-                  category: selectedCat,
-                  keterangan: noteController.text.trim().isEmpty ? 'Pengecekan rutin di gang buntu' : noteController.text.trim(),
-                  photoPath: '/storage/emulated/0/DCIM/insiden_${DateTime.now().millisecondsSinceEpoch}.jpg',
-                );
-              },
-              child: const Text('Kirim Laporan'),
-            ),
-          ],
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ronda.reportIncident(
+                category: selectedCat,
+                keterangan: noteController.text.trim().isEmpty
+                    ? 'Pengecekan rutin di gang buntu'
+                    : noteController.text.trim(),
+                photoPath: photo?.path ?? '',
+              );
+            },
+            child: const Text('Kirim Laporan'),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildPatrolMapCard(BuildContext context, RondaProvider ronda) {
     return Card(

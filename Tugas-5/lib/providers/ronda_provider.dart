@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:uuid/uuid.dart';
 
 import '../data/mock/mock_backend.dart';
 import '../data/mock/seed_data.dart';
@@ -14,6 +15,7 @@ import '../domain/ronda/services/qr_token_verifier.dart';
 /// Terkoneksi secara otomatis ke Cloud Supabase dengan Realtime Streaming
 /// dan Fallback Aman ke Mock Backend jika Offline / Blank Spot.
 class RondaProvider extends ChangeNotifier {
+  static const _uuid = Uuid();
   RondaProvider({SupabaseRondaService? supabaseService, MockBackend? backend}) {
     _backend = backend ?? MockBackend();
     _supabase = supabaseService ?? SupabaseRondaService();
@@ -265,7 +267,7 @@ class RondaProvider extends ChangeNotifier {
         _backend.syncSchedules(cloudSchedules);
       }
 
-      final cloudSwaps = await _supabase.fetchShiftSwaps();
+      final cloudSwaps = await _supabase.fetchShiftSwaps(rtId);
       if (cloudSwaps.isNotEmpty) {
         _backend.syncShiftSwaps(cloudSwaps);
       }
@@ -297,7 +299,7 @@ class RondaProvider extends ChangeNotifier {
         }
       }, onError: (e) => debugPrint('Realtime Checkin Error: $e'));
 
-      _swapSub = _supabase.streamShiftSwaps().listen((items) {
+      _swapSub = _supabase.streamShiftSwaps(rtId).listen((items) {
         if (items.isNotEmpty) {
           _backend.syncShiftSwaps(items);
           notifyListeners();
@@ -815,18 +817,18 @@ class RondaProvider extends ChangeNotifier {
   // 5. TUKAR JADWAL (SHIFT SWAP) LENGKAP
   // ==========================================
 
-  void requestShiftSwap({
+  Future<void> requestShiftSwap({
     required String scheduleId,
     required String targetUserId,
     required String alasan,
     String? requesterShift,
     DateTime? targetDate,
     String? targetShift,
-  }) {
+  }) async {
     if (_currentUser == null) return;
     try {
       final swap = _backend.requestShiftSwap(
-        requestId: 'swp-${DateTime.now().millisecondsSinceEpoch}',
+        requestId: _uuid.v4(),
         scheduleId: scheduleId,
         requesterId: _currentUser!.id,
         targetUserId: targetUserId,
@@ -836,20 +838,24 @@ class RondaProvider extends ChangeNotifier {
         targetShift: targetShift,
       );
 
-      if (_supabase.isAvailable) {
-        unawaited(_supabase.insertShiftSwap(swap));
+      if (!_supabase.isAvailable) {
+        _lastErrorMessage =
+            'Permintaan tersimpan di perangkat ini saja. Atur URL dan anon key Supabase agar tersambung antar pengguna.';
+      } else {
+        await _supabase.insertShiftSwap(swap);
+        _lastSuccessMessage =
+            'Permintaan tukar jadwal tersimpan dan terkirim ke petugas pengganti.';
       }
-
-      _lastSuccessMessage =
-          'Permintaan tukar jadwal terkirim ke petugas pengganti.';
       notifyListeners();
     } catch (e) {
-      _lastErrorMessage = e.toString();
+      _lastErrorMessage =
+          'Permintaan ada di perangkat ini, tetapi gagal disinkronkan: $e';
       notifyListeners();
     }
   }
 
-  void respondShiftSwap({required String requestId, required bool isAccepted}) {
+  Future<void> respondShiftSwap(
+      {required String requestId, required bool isAccepted}) async {
     if (_currentUser == null) return;
     try {
       _backend.respondShiftSwap(
@@ -860,16 +866,18 @@ class RondaProvider extends ChangeNotifier {
 
       if (_supabase.isAvailable) {
         final swap = _backend.shiftSwaps.firstWhere((s) => s.id == requestId);
-        unawaited(_supabase.updateShiftSwap(swap));
+        await _supabase.updateShiftSwap(swap);
         if (isAccepted && _currentUser != null) {
-          unawaited(_supabase
-              .upsertSchedules(_backend.getSchedules(_currentUser!.rtId)));
+          await _supabase.upsertSchedulesOrThrow(
+              _backend.getSchedules(_currentUser!.rtId));
         }
+        _lastSuccessMessage = isAccepted
+            ? 'Pertukaran disetujui dan perubahan telah disinkronkan.'
+            : 'Permintaan tukar jadwal ditolak dan disinkronkan.';
+      } else {
+        _lastErrorMessage =
+            'Perubahan tersimpan di perangkat ini saja; Supabase belum dikonfigurasi.';
       }
-
-      _lastSuccessMessage = isAccepted
-          ? 'Pertukaran jadwal berhasil disetujui! Jadwal ronda Anda dan rekan otomatis diperbarui.'
-          : 'Pertukaran jadwal telah ditolak.';
       notifyListeners();
     } catch (e) {
       _lastErrorMessage = e.toString();
@@ -877,7 +885,8 @@ class RondaProvider extends ChangeNotifier {
     }
   }
 
-  void approveShiftSwap({required String requestId, required bool isApproved}) {
+  Future<void> approveShiftSwap(
+      {required String requestId, required bool isApproved}) async {
     if (_currentUser == null || _currentUser!.role != UserRole.adminRt) return;
     try {
       _backend.approveShiftSwap(
@@ -888,16 +897,18 @@ class RondaProvider extends ChangeNotifier {
 
       if (_supabase.isAvailable) {
         final swap = _backend.shiftSwaps.firstWhere((s) => s.id == requestId);
-        unawaited(_supabase.updateShiftSwap(swap));
+        await _supabase.updateShiftSwap(swap);
         if (isApproved && _currentUser != null) {
-          unawaited(_supabase
-              .upsertSchedules(_backend.getSchedules(_currentUser!.rtId)));
+          await _supabase.upsertSchedulesOrThrow(
+              _backend.getSchedules(_currentUser!.rtId));
         }
+        _lastSuccessMessage = isApproved
+            ? 'Perpindahan jadwal disetujui dan disinkronkan.'
+            : 'Pengajuan perpindahan jadwal ditolak dan disinkronkan.';
+      } else {
+        _lastErrorMessage =
+            'Perubahan tersimpan di perangkat ini saja; Supabase belum dikonfigurasi.';
       }
-
-      _lastSuccessMessage = isApproved
-          ? 'Perpindahan jadwal resmi disetujui. Jadwal patroli telah diperbarui.'
-          : 'Pengajuan perpindahan jadwal ditolak.';
       notifyListeners();
     } catch (e) {
       _lastErrorMessage = e.toString();

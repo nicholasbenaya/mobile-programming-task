@@ -195,7 +195,8 @@ class RondaUser {
   final String salt;
 
   /// Algoritma Hashing SHA-256 Ber-Salt untuk Keamanan Kredensial
-  static String hashPassword(String password, [String salt = 'ronda_salt_its_kelompok_4']) {
+  static String hashPassword(String password,
+      [String salt = 'ronda_salt_its_kelompok_4']) {
     final bytes = utf8.encode(password + salt);
     return sha256.convert(bytes).toString();
   }
@@ -297,8 +298,10 @@ class Checkpoint {
     final targetHour = int.tryParse(parts[0]) ?? 22;
     final targetMinute = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
 
-    final targetDateTime = DateTime(now.year, now.month, now.day, targetHour, targetMinute);
-    final windowStart = targetDateTime.subtract(Duration(minutes: windowMenitSebelum));
+    final targetDateTime =
+        DateTime(now.year, now.month, now.day, targetHour, targetMinute);
+    final windowStart =
+        targetDateTime.subtract(Duration(minutes: windowMenitSebelum));
     final windowEnd = targetDateTime.add(Duration(minutes: windowMenitSetelah));
 
     if (now.isBefore(windowStart)) {
@@ -334,8 +337,10 @@ class Checkpoint {
         radiusMeter: (json['radius_meter'] as num?)?.toDouble() ?? 25.0,
         secretKey: json['secret_key'] as String,
         targetWaktuCheckin: json['target_waktu_checkin'] as String? ?? '22:30',
-        windowMenitSebelum: (json['window_menit_sebelum'] as num?)?.toInt() ?? 15,
-        windowMenitSetelah: (json['window_menit_setelah'] as num?)?.toInt() ?? 30,
+        windowMenitSebelum:
+            (json['window_menit_sebelum'] as num?)?.toInt() ?? 15,
+        windowMenitSetelah:
+            (json['window_menit_setelah'] as num?)?.toInt() ?? 30,
       );
 }
 
@@ -426,7 +431,8 @@ class PatrolSchedule {
     final parts = jamMulai.split(':');
     final h = int.tryParse(parts[0]) ?? 22;
     final m = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
-    return DateTime(tanggalRonda.year, tanggalRonda.month, tanggalRonda.day, h, m);
+    return DateTime(
+        tanggalRonda.year, tanggalRonda.month, tanggalRonda.day, h, m);
   }
 
   /// Memeriksa apakah waktu tertentu berada dalam rentang shift ini
@@ -466,7 +472,8 @@ class PatrolSchedule {
     final endMin = eH * 60 + eM;
     final duration = endMin - startMin;
 
-    final offsetMin = startMin + ((duration * (cpIndex + 1)) ~/ (totalCheckpoints + 1));
+    final offsetMin =
+        startMin + ((duration * (cpIndex + 1)) ~/ (totalCheckpoints + 1));
     final normalizedHour = (offsetMin ~/ 60) % 24;
     final normalizedMin = offsetMin % 60;
     return '${normalizedHour.toString().padLeft(2, '0')}:${normalizedMin.toString().padLeft(2, '0')}';
@@ -491,7 +498,8 @@ class PatrolSchedule {
         userId: json['user_id'] as String,
         petugasName: json['petugas_name'] as String,
         tanggalRonda: DateTime.parse(json['tanggal_ronda'] as String),
-        shiftName: json['shift_name'] as String? ?? 'Shift Malam (22:00 - 04:00)',
+        shiftName:
+            json['shift_name'] as String? ?? 'Shift Malam (22:00 - 04:00)',
         jamMulai: json['jam_mulai'] as String? ?? '22:00',
         jamSelesai: json['jam_selesai'] as String? ?? '04:00',
         isCompleted: json['is_completed'] as bool? ?? false,
@@ -503,6 +511,7 @@ class PatrolSchedule {
 class ShiftSwapRequest {
   ShiftSwapRequest({
     required this.id,
+    this.rtId = '',
     required this.scheduleId,
     required this.requesterId,
     required this.requesterName,
@@ -517,6 +526,7 @@ class ShiftSwapRequest {
   });
 
   final String id;
+  final String rtId;
   final String scheduleId;
   final String requesterId;
   final String requesterName;
@@ -531,6 +541,7 @@ class ShiftSwapRequest {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'rt_id': rtId,
         'schedule_id': scheduleId,
         'requester_id': requesterId,
         'requester_name': requesterName,
@@ -544,8 +555,10 @@ class ShiftSwapRequest {
         'created_at': createdAt.toIso8601String(),
       };
 
-  factory ShiftSwapRequest.fromJson(Map<String, dynamic> json) => ShiftSwapRequest(
+  factory ShiftSwapRequest.fromJson(Map<String, dynamic> json) =>
+      ShiftSwapRequest(
         id: json['id'] as String,
+        rtId: json['rt_id'] as String? ?? '',
         scheduleId: json['schedule_id'] as String,
         requesterId: json['requester_id'] as String,
         requesterName: json['requester_name'] as String,
@@ -553,7 +566,9 @@ class ShiftSwapRequest {
         targetUserName: json['target_user_name'] as String,
         alasan: json['alasan'] as String,
         requesterShift: json['requester_shift'] as String? ?? 'Shift Malam',
-        targetDate: json['target_date'] != null ? DateTime.parse(json['target_date'] as String) : null,
+        targetDate: json['target_date'] != null
+            ? DateTime.parse(json['target_date'] as String)
+            : null,
         targetShift: json['target_shift'] as String? ?? 'Shift Malam',
         status: ShiftSwapStatus.values.firstWhere(
           (s) => s.name == json['status'],
@@ -607,12 +622,14 @@ class RondaNotification {
         'is_read': isRead,
       };
 
-  factory RondaNotification.fromJson(Map<String, dynamic> json) => RondaNotification(
+  factory RondaNotification.fromJson(Map<String, dynamic> json) =>
+      RondaNotification(
         id: json['id'] as String,
         rtId: json['rt_id'] as String,
         title: json['title'] as String,
         body: json['body'] as String,
-        type: RondaNotificationType.values.firstWhere((t) => t.name == json['type']),
+        type: RondaNotificationType.values
+            .firstWhere((t) => t.name == json['type']),
         targetUserId: json['target_user_id'] as String?,
         includeOffDuty: json['include_off_duty'] as bool? ?? false,
         createdAt: DateTime.parse(json['created_at'] as String),
@@ -669,7 +686,8 @@ class EmergencyEvent {
   bool get isActive => status != EmergencyStatus.selesai;
   bool get isBelumDitangani => status == EmergencyStatus.belumDitangani;
   bool get isOnGoing => status == EmergencyStatus.onGoing;
-  bool get isMenungguVerifikasiRt => status == EmergencyStatus.menungguVerifikasiRt;
+  bool get isMenungguVerifikasiRt =>
+      status == EmergencyStatus.menungguVerifikasiRt;
   bool get isSelesai => status == EmergencyStatus.selesai;
 
   Duration? get durationToResolve => resolvedAt?.difference(triggeredAt);
@@ -707,13 +725,19 @@ class EmergencyEvent {
         latitude: (json['latitude'] as num).toDouble(),
         longitude: (json['longitude'] as num).toDouble(),
         catatan: json['catatan'] as String?,
-        status: EmergencyStatus.fromString(json['status'] as String? ?? 'BELUM_DITANGANI'),
+        status: EmergencyStatus.fromString(
+            json['status'] as String? ?? 'BELUM_DITANGANI'),
         triggeredAt: DateTime.parse(json['triggered_at'] as String),
-        respondedAt: json['responded_at'] != null ? DateTime.parse(json['responded_at'] as String) : null,
+        respondedAt: json['responded_at'] != null
+            ? DateTime.parse(json['responded_at'] as String)
+            : null,
         respondedByUserId: json['responded_by_user_id'] as String?,
         respondedByUserName: json['responded_by_user_name'] as String?,
-        resolvedAt: json['resolved_at'] != null ? DateTime.parse(json['resolved_at'] as String) : null,
-        resolvedVia: EmergencyResolutionType.fromString(json['resolved_via'] as String?),
+        resolvedAt: json['resolved_at'] != null
+            ? DateTime.parse(json['resolved_at'] as String)
+            : null,
+        resolvedVia:
+            EmergencyResolutionType.fromString(json['resolved_via'] as String?),
         resolutionPhotoPath: json['resolution_photo_path'] as String?,
         resolutionNotes: json['resolution_notes'] as String?,
         verificationQrToken: json['verification_qr_token'] as String?,

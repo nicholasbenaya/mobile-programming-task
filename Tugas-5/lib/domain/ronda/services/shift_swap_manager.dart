@@ -22,17 +22,20 @@ class ShiftSwapManager {
     }
 
     if (schedule.userId != requester.id) {
-      throw StateError('Hanya petugas yang terjadwal yang dapat mengajukan pertukaran shift ini.');
+      throw StateError(
+          'Hanya petugas yang terjadwal yang dapat mengajukan pertukaran shift ini.');
     }
 
     if (schedule.isCompleted) {
-      throw StateError('Tidak dapat menukar jadwal yang sudah selesai dilaksanakan.');
+      throw StateError(
+          'Tidak dapat menukar jadwal yang sudah selesai dilaksanakan.');
     }
 
     // 1. Single-pending constraint (anti pengajuan ganda untuk 1 jadwal)
     if (existingSwaps != null) {
       final hasPending = existingSwaps.any(
-        (s) => s.scheduleId == schedule.id && s.status == ShiftSwapStatus.pending,
+        (s) =>
+            s.scheduleId == schedule.id && s.status == ShiftSwapStatus.pending,
       );
       if (hasPending) {
         throw StateError(
@@ -53,6 +56,7 @@ class ShiftSwapManager {
 
     return ShiftSwapRequest(
       id: requestId,
+      rtId: schedule.rtId,
       scheduleId: schedule.id,
       requesterId: requester.id,
       requesterName: requester.namaLengkap,
@@ -79,17 +83,20 @@ class ShiftSwapManager {
     DateTime? responseTime,
   }) {
     if (request.targetUserId != respondingUserId) {
-      throw StateError('Hanya pengguna yang ditunjuk yang berhak merespon pertukaran ini.');
+      throw StateError(
+          'Hanya pengguna yang ditunjuk yang berhak merespon pertukaran ini.');
     }
 
     if (request.status != ShiftSwapStatus.pending) {
-      throw StateError('Permintaan tukar jadwal ini sudah tidak dalam status pending (${request.status.name}).');
+      throw StateError(
+          'Permintaan tukar jadwal ini sudah tidak dalam status pending (${request.status.name}).');
     }
 
     // Cek batas waktu respon (H-3 jam sebelum shift)
     final now = responseTime ?? DateTime.now();
     if (schedule != null) {
-      final deadline = schedule.startDateTime.subtract(const Duration(hours: 3));
+      final deadline =
+          schedule.startDateTime.subtract(const Duration(hours: 3));
       if (now.isAfter(deadline)) {
         request.status = ShiftSwapStatus.expired;
         throw StateError(
@@ -122,11 +129,13 @@ class ShiftSwapManager {
     required bool isApproved,
   }) {
     if (approverRole != UserRole.adminRt) {
-      throw StateError('Hanya Ketua RT (Admin) yang memiliki wewenang mengesahkan pertukaran jadwal.');
+      throw StateError(
+          'Hanya Ketua RT (Admin) yang memiliki wewenang mengesahkan pertukaran jadwal.');
     }
 
     if (schedule.id != request.scheduleId) {
-      throw ArgumentError('ID Jadwal tidak cocok dengan data permintaan tukar.');
+      throw ArgumentError(
+          'ID Jadwal tidak cocok dengan data permintaan tukar.');
     }
 
     if (isApproved) {

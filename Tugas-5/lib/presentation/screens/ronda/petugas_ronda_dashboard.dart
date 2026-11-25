@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/errors/app_exception.dart';
@@ -697,14 +696,12 @@ class PetugasRondaDashboard extends StatelessWidget {
                           formError = null;
                         });
                         try {
-                          final savedPhoto = await _persistEvidencePhoto(
-                            selectedPhoto!,
-                            prefix: 'bukti_sos_${event.id}',
-                          );
+                          final photoPath =
+                              await ronda.uploadRondaPhoto(selectedPhoto!);
                           if (!ctx.mounted) return;
                           ronda.resolveEmergencyWithPhoto(
                             eventId: event.id,
-                            photoPath: savedPhoto.path,
+                            photoPath: photoPath,
                             notes: notesController.text.trim(),
                           );
                           Navigator.pop(ctx);
@@ -1295,16 +1292,20 @@ class PetugasRondaDashboard extends StatelessWidget {
                           formError = null;
                         });
                         try {
-                          final savedPhoto = await _persistEvidencePhoto(
-                            selectedPhoto!,
-                            prefix: 'insiden',
-                          );
+                          final photoPath =
+                              await ronda.uploadRondaPhoto(selectedPhoto!);
                           if (!ctx.mounted) return;
-                          ronda.reportIncident(
+                          final sent = await ronda.reportIncident(
                             category: selectedCat,
                             keterangan: note,
-                            photoPath: savedPhoto.path,
+                            photoPath: photoPath,
                           );
+                          if (!sent) {
+                            await ronda.deleteRondaPhoto(photoPath);
+                            throw StateError(ronda.lastErrorMessage ??
+                                'Laporan gagal dikirim.');
+                          }
+                          if (!ctx.mounted) return;
                           Navigator.pop(ctx);
                         } catch (_) {
                           if (ctx.mounted) {
@@ -1329,24 +1330,6 @@ class PetugasRondaDashboard extends StatelessWidget {
         },
       ),
     ).whenComplete(noteController.dispose);
-  }
-
-  Future<File> _persistEvidencePhoto(File source,
-      {required String prefix}) async {
-    final appDirectory = await getApplicationDocumentsDirectory();
-    final evidenceDirectory = Directory(
-      '${appDirectory.path}${Platform.pathSeparator}ronda_reports',
-    );
-    await evidenceDirectory.create(recursive: true);
-
-    final extension = source.path.contains('.')
-        ? source.path.split('.').last.toLowerCase()
-        : 'jpg';
-    final fileName =
-        '${prefix}_${DateTime.now().microsecondsSinceEpoch}.$extension';
-    return source.copy(
-      '${evidenceDirectory.path}${Platform.pathSeparator}$fileName',
-    );
   }
 
   Widget _buildPatrolMapCard(BuildContext context, RondaProvider ronda) {

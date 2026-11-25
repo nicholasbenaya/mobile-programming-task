@@ -19,30 +19,75 @@ class SupabaseRondaService {
 
   static const rondaRtId = 'RT-04-RW-02-SUKOLILO';
 
+  String _rondaEmail(String whatsapp) {
+    final digits = whatsapp.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 8) {
+      throw const FormatException('Nomor WhatsApp tidak valid.');
+    }
+    return 'ronda.$digits@example.com';
+  }
+
   Future<RondaUser> signInRondaUser({
     required String whatsapp,
     required String password,
   }) async {
     final c = client;
     if (c == null) throw StateError('Supabase belum dikonfigurasi.');
-    final response = await c.rpc('ronda_demo_login', params: {
-      'p_whatsapp': whatsapp.replaceAll(RegExp(r'\D'), ''),
-      'p_password': password,
-    });
-    if (response is! List || response.isEmpty) {
-      throw StateError('Nomor WhatsApp atau kata sandi salah.');
-    }
-    return RondaUser.fromJson(Map<String, dynamic>.from(response.first));
+    final response = await c.auth.signInWithPassword(
+      email: _rondaEmail(whatsapp),
+      password: password,
+    );
+    final user = response.user;
+    if (user == null) throw StateError('Supabase tidak mengembalikan akun.');
+    return _rondaUserFromAuth(user);
   }
 
-  RondaUser? get currentRondaUser => null;
+  RondaUser? get currentRondaUser {
+    final user = client?.auth.currentUser;
+    if (user == null) return null;
+    try {
+      return _rondaUserFromAuth(user);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  RondaUser _rondaUserFromAuth(User user) {
+    final claims = user.appMetadata;
+    final role = claims['role'] as String?;
+    final rondaId = claims['ronda_user_id'] as String?;
+    final rtId = claims['rt_id'] as String?;
+    final whatsapp = claims['whatsapp'] as String?;
+    final name = claims['full_name'] as String?;
+    final address = claims['address'] as String?;
+    if (role == null ||
+        rondaId == null ||
+        rtId == null ||
+        whatsapp == null ||
+        name == null ||
+        address == null) {
+      throw StateError(
+          'Metadata akun Supabase belum memiliki profil Ronda lengkap.');
+    }
+    return RondaUser(
+      id: rondaId,
+      rtId: rtId,
+      namaLengkap: name,
+      nomorWhatsapp: whatsapp,
+      alamatRumah: address,
+      role: UserRole.fromString(role),
+      fcmToken: claims['fcm_token'] as String?,
+    );
+  }
 
   Future<void> signOutRondaUser() async {
     final c = client;
     if (c != null && c.auth.currentSession != null) await c.auth.signOut();
   }
 
-  RondaPhotoRepository get _rondaPhotos {
+  late final RondaPhotoRepository _rondaPhotos = _createRondaPhotoRepository();
+
+  RondaPhotoRepository _createRondaPhotoRepository() {
     final c = client;
     if (c == null) throw StateError('Supabase belum dikonfigurasi.');
     return RondaPhotoRepository(c);
@@ -293,12 +338,19 @@ class SupabaseRondaService {
 
   Future<void> insertIncident(IncidentReport incident) async {
     final c = client;
-    if (c == null) return;
-    try {
-      await c.from('incident_reports').insert(incident.toJson());
-    } catch (e) {
-      debugPrint('Error insertIncident: $e');
-    }
+    if (c == null) throw StateError('Supabase belum dikonfigurasi.');
+    await c.from('incident_reports').insert(incident.toJson());
+  }
+
+  Stream<List<IncidentReport>> streamIncidents(String rtId) {
+    final c = client;
+    if (c == null) return const Stream.empty();
+    return c
+        .from('incident_reports')
+        .stream(primaryKey: ['id'])
+        .eq('rt_id', rtId)
+        .map(
+            (rows) => rows.map((row) => IncidentReport.fromJson(row)).toList());
   }
 
   // ==========================================

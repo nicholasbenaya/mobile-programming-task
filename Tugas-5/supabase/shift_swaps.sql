@@ -71,26 +71,10 @@ with check (
   )
 );
 
--- MODE DEMO (akun disimpan di ronda_demo_accounts, tanpa Supabase Auth).
--- Akses anon dibatasi ke satu RT demo; jangan gunakan policy ini untuk data nyata.
+-- Hapus policy terbuka mode demo lama; Ronda sekarang memakai Supabase Auth.
 drop policy if exists "shift_swaps_demo_select" on public.shift_swaps;
-create policy "shift_swaps_demo_select"
-on public.shift_swaps for select to anon
-using (rt_id = 'RT-04-RW-02-SUKOLILO');
-
 drop policy if exists "shift_swaps_demo_insert" on public.shift_swaps;
-create policy "shift_swaps_demo_insert"
-on public.shift_swaps for insert to anon
-with check (
-  rt_id = 'RT-04-RW-02-SUKOLILO'
-  and status = 'pending'
-);
-
 drop policy if exists "shift_swaps_demo_update" on public.shift_swaps;
-create policy "shift_swaps_demo_update"
-on public.shift_swaps for update to anon
-using (rt_id = 'RT-04-RW-02-SUKOLILO')
-with check (rt_id = 'RT-04-RW-02-SUKOLILO');
 
 do $$
 begin
@@ -99,3 +83,5 @@ exception
   when duplicate_object then null;
   when undefined_object then null;
 end $$;
+
+notify pgrst, 'reload schema';

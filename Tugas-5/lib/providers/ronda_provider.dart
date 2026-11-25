@@ -35,12 +35,14 @@ class RondaProvider extends ChangeNotifier {
   RondaUser? _currentUser;
   late List<Checkpoint> _checkpoints;
   final List<RondaUser> _cloudUsers = [];
+  final Map<String, Future<String>> _photoUrlCache = {};
 
   StreamSubscription<List<EmergencyEvent>>? _emergencySub;
   StreamSubscription<List<PatrolCheckin>>? _checkinSub;
   StreamSubscription<List<ShiftSwapRequest>>? _swapSub;
   StreamSubscription<List<PatrolSchedule>>? _scheduleSub;
   StreamSubscription<List<RondaNotification>>? _notifSub;
+  StreamSubscription<List<IncidentReport>>? _incidentSub;
 
   Position? _currentGpsPosition;
   bool _isOfflineMode = false;
@@ -80,8 +82,20 @@ class RondaProvider extends ChangeNotifier {
     return _supabase.uploadRondaPhoto(photo, rtId: user.rtId);
   }
 
-  Future<String> rondaPhotoUrl(String path) =>
-      _supabase.createRondaPhotoUrl(path);
+  Future<String> rondaPhotoUrl(String path) => _photoUrlCache.putIfAbsent(
+        path,
+        () async {
+          try {
+            return await _supabase.createRondaPhotoUrl(path);
+          } catch (_) {
+            _photoUrlCache.remove(path);
+            rethrow;
+          }
+        },
+      );
+
+  Future<void> deleteRondaPhoto(String path) =>
+      _supabase.deleteRondaPhoto(path);
 
   /// Permintaan tukar jadwal yang masuk (ditujukan kepada saya & masih pending)
   List<ShiftSwapRequest> get myIncomingSwapRequests {
@@ -247,6 +261,8 @@ class RondaProvider extends ChangeNotifier {
     _scheduleSub = null;
     _notifSub?.cancel();
     _notifSub = null;
+    _incidentSub?.cancel();
+    _incidentSub = null;
   }
 
   Future<void> _initSupabaseRealtime(String rtId) async {
@@ -333,6 +349,13 @@ class RondaProvider extends ChangeNotifier {
           notifyListeners();
         }
       }, onError: (e) => debugPrint('Realtime Notif Error: $e'));
+
+      _incidentSub = _supabase.streamIncidents(rtId).listen((items) {
+        if (items.isNotEmpty) {
+          _backend.syncIncidents(items);
+          notifyListeners();
+        }
+      }, onError: (e) => debugPrint('Realtime Incident Error: $e'));
     } catch (e) {
       debugPrint('Supabase initial sync warning: $e');
     }
@@ -382,6 +405,7 @@ class RondaProvider extends ChangeNotifier {
   void logout() {
     _cancelSubscriptions();
     unawaited(_supabase.signOutRondaUser());
+    _photoUrlCache.clear();
     _currentUser = null;
     _lastErrorMessage = null;
     _lastSuccessMessage = 'Sesi telah berakhir. Silakan login kembali.';
@@ -802,12 +826,12 @@ class RondaProvider extends ChangeNotifier {
   // 4. LAPORAN TEMUAN INSIDEN BERFOTO
   // ==========================================
 
-  void reportIncident({
+  Future<bool> reportIncident({
     required IncidentCategory category,
     required String keterangan,
     required String photoPath,
-  }) {
-    if (_currentUser == null) return;
+  }) async {
+    if (_currentUser == null) return false;
     final lat = _currentGpsPosition?.latitude ?? -7.281970;
     final lon = _currentGpsPosition?.longitude ?? 112.795323;
 
@@ -822,13 +846,19 @@ class RondaProvider extends ChangeNotifier {
       compass: 90.0,
     );
 
-    if (_supabase.isAvailable) {
-      unawaited(_supabase.insertIncident(report));
+    try {
+      await _supabase.insertIncident(report);
+      _lastErrorMessage = null;
+      _lastSuccessMessage =
+          'Laporan insiden dan foto berhasil dikirim ke Linimasa Keamanan RT.';
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _backend.removeIncident(report.id);
+      _lastErrorMessage = 'Gagal mengirim laporan ke Supabase: $e';
+      notifyListeners();
+      return false;
     }
-
-    _lastSuccessMessage =
-        'Laporan insiden berhasil dikirim ke Linimasa Keamanan RT.';
-    notifyListeners();
   }
 
   // ==========================================

@@ -659,6 +659,11 @@ class MockBackend {
 
   List<PatrolCheckin> get patrolLogs => List.unmodifiable(_patrolLogs);
   List<IncidentReport> get incidents => List.unmodifiable(_incidents);
+
+  void removeIncident(String incidentId) {
+    _incidents.removeWhere((incident) => incident.id == incidentId);
+  }
+
   List<EmergencyEvent> get emergencyEvents =>
       List.unmodifiable(_emergencyEvents);
   List<EmergencyEvent> get resolvedEmergencies => _emergencyEvents

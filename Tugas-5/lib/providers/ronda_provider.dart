@@ -71,7 +71,9 @@ class RondaProvider extends ChangeNotifier {
   List<ShiftSwapRequest> get myIncomingSwapRequests {
     if (_currentUser == null) return [];
     return shiftSwaps
-        .where((s) => s.targetUserId == _currentUser!.id && s.status == ShiftSwapStatus.pending)
+        .where((s) =>
+            s.targetUserId == _currentUser!.id &&
+            s.status == ShiftSwapStatus.pending)
         .toList();
   }
 
@@ -117,11 +119,13 @@ class RondaProvider extends ChangeNotifier {
   PatrolSchedule? get myTodaySchedule {
     if (_currentUser == null) return null;
     final now = DateTime.now();
-    return schedules.where((s) =>
-        s.userId == _currentUser!.id &&
-        s.tanggalRonda.year == now.year &&
-        s.tanggalRonda.month == now.month &&
-        s.tanggalRonda.day == now.day).firstOrNull;
+    return schedules
+        .where((s) =>
+            s.userId == _currentUser!.id &&
+            s.tanggalRonda.year == now.year &&
+            s.tanggalRonda.month == now.month &&
+            s.tanggalRonda.day == now.day)
+        .firstOrNull;
   }
 
   /// Ambil daftar jadwal untuk tanggal tertentu (Kalender Umum)
@@ -151,18 +155,21 @@ class RondaProvider extends ChangeNotifier {
         log.scannedAt.day == now.day);
 
     // Cari jadwal shift petugas bersangkutan untuk menentukan target waktu checkpoint proporsional
-    final userSched = schedules.where((s) =>
-        s.userId == targetUserId &&
-        !s.isLibur &&
-        s.tanggalRonda.year == now.year &&
-        s.tanggalRonda.month == now.month &&
-        s.tanggalRonda.day == now.day).firstOrNull;
+    final userSched = schedules
+        .where((s) =>
+            s.userId == targetUserId &&
+            !s.isLibur &&
+            s.tanggalRonda.year == now.year &&
+            s.tanggalRonda.month == now.month &&
+            s.tanggalRonda.day == now.day)
+        .firstOrNull;
 
     final cpIdx = _checkpoints.indexOf(cp);
     final targetTime = userSched?.getTargetTimeForCheckpoint(
-      cpIdx >= 0 ? cpIdx : 0,
-      _checkpoints.length,
-    ) ?? cp.targetWaktuCheckin;
+          cpIdx >= 0 ? cpIdx : 0,
+          _checkpoints.length,
+        ) ??
+        cp.targetWaktuCheckin;
 
     return cp.calculateStatus(
       currentTime: now,
@@ -172,14 +179,16 @@ class RondaProvider extends ChangeNotifier {
   }
 
   /// Evaluasi status jadwal pos checkpoint untuk petugas yang sedang aktif
-  CheckpointScheduleStatus getCheckpointStatus(Checkpoint cp, [DateTime? time]) {
+  CheckpointScheduleStatus getCheckpointStatus(Checkpoint cp,
+      [DateTime? time]) {
     return getOfficerCheckpointStatus(cp, time: time);
   }
 
   /// Daftar pos yang terlambat / terlewat belum dipindai
   List<Checkpoint> get overdueCheckpoints {
     return _checkpoints
-        .where((cp) => getCheckpointStatus(cp) == CheckpointScheduleStatus.terlewat)
+        .where((cp) =>
+            getCheckpointStatus(cp) == CheckpointScheduleStatus.terlewat)
         .toList();
   }
 
@@ -318,7 +327,8 @@ class RondaProvider extends ChangeNotifier {
   // ==========================================
 
   /// Login resmi dengan nomor WhatsApp dan kata sandi terenkripsi
-  Future<bool> login({required String whatsapp, required String password}) async {
+  Future<bool> login(
+      {required String whatsapp, required String password}) async {
     _lastErrorMessage = null;
     _lastSuccessMessage = null;
 
@@ -326,14 +336,18 @@ class RondaProvider extends ChangeNotifier {
       final user = _backend.login(whatsapp: whatsapp, password: password);
       _currentUser = user;
       _checkpoints = _backend.getCheckpoints(user.rtId);
-      _lastSuccessMessage = 'Login Berhasil: Selamat datang, ${user.namaLengkap}!';
+      _lastSuccessMessage =
+          'Login Berhasil: Selamat datang, ${user.namaLengkap}!';
       notifyListeners();
 
       // Inisialisasi Realtime & Sinkronisasi Cloud jika Supabase terhubung
       unawaited(_initSupabaseRealtime(user.rtId));
       return true;
     } catch (e) {
-      _lastErrorMessage = e.toString().replaceAll('StateError: ', '').replaceAll('ArgumentError: ', '');
+      _lastErrorMessage = e
+          .toString()
+          .replaceAll('StateError: ', '')
+          .replaceAll('ArgumentError: ', '');
       notifyListeners();
       return false;
     }
@@ -341,7 +355,8 @@ class RondaProvider extends ChangeNotifier {
 
   /// Autologin cepat untuk penguji / evaluator (memasukkan kredensial otomatis)
   Future<bool> quickLogin(RondaUser user) async {
-    return login(whatsapp: user.nomorWhatsapp, password: SeedData.defaultDemoPassword);
+    return login(
+        whatsapp: user.nomorWhatsapp, password: SeedData.defaultDemoPassword);
   }
 
   /// Keluar dari sesi pengguna
@@ -393,7 +408,8 @@ class RondaProvider extends ChangeNotifier {
         }
         return true;
       });
-      _lastSuccessMessage = 'Koneksi Pulih! $count rekaman offline berhasil disinkronkan ke server & cloud.';
+      _lastSuccessMessage =
+          'Koneksi Pulih! $count rekaman offline berhasil disinkronkan ke server & cloud.';
     }
     notifyListeners();
   }
@@ -401,36 +417,41 @@ class RondaProvider extends ChangeNotifier {
   /// Membaca koordinat GPS langsung dari perangkat
   Future<void> fetchLiveLocation() async {
     _isLoadingGps = true;
+    _lastErrorMessage = null;
     notifyListeners();
 
     try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _currentGpsPosition = null;
+        _lastErrorMessage =
+            'Aktifkan layanan lokasi perangkat untuk melakukan check-in.';
+        return;
+      }
+
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
 
-      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
         _currentGpsPosition = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
             timeLimit: Duration(seconds: 10),
           ),
         );
+      } else {
+        _currentGpsPosition = null;
+        _lastErrorMessage = permission == LocationPermission.deniedForever
+            ? 'Izin lokasi ditolak permanen. Aktifkan izin lokasi melalui Pengaturan perangkat.'
+            : 'Izin lokasi diperlukan untuk melakukan check-in.';
       }
-    } catch (_) {
-      // Fallback koordinat jika di simulator desktop/emulator tanpa fix GPS
-      _currentGpsPosition ??= Position(
-        latitude: -7.281970,
-        longitude: 112.795323,
-        timestamp: DateTime.now(),
-        accuracy: 5.0,
-        altitude: 0.0,
-        heading: 0.0,
-        speed: 0.0,
-        speedAccuracy: 0.0,
-        altitudeAccuracy: 0.0,
-        headingAccuracy: 0.0,
-      );
+    } catch (e) {
+      _currentGpsPosition = null;
+      _lastErrorMessage =
+          'Lokasi perangkat tidak dapat diperoleh. Coba lagi di area terbuka.';
     } finally {
       _isLoadingGps = false;
       notifyListeners();
@@ -440,6 +461,7 @@ class RondaProvider extends ChangeNotifier {
   /// Melakukan Check-in pos patroli dengan verifikasi QR fisik dan Geofence GPS
   Future<bool> checkinCheckpoint({
     required Checkpoint checkpoint,
+    String? scannedQrPayload,
     bool simulateProximity = false,
   }) async {
     if (_currentUser == null) return false;
@@ -456,12 +478,17 @@ class RondaProvider extends ChangeNotifier {
       lon = checkpoint.longitude + 0.00003;
       accuracy = 4.0;
     } else {
-      if (_currentGpsPosition == null) {
-        await fetchLiveLocation();
+      await fetchLiveLocation();
+      final position = _currentGpsPosition;
+      if (position == null) {
+        _lastErrorMessage ??=
+            'Lokasi GPS belum tersedia. Check-in belum disimpan.';
+        notifyListeners();
+        return false;
       }
-      lat = _currentGpsPosition?.latitude ?? checkpoint.latitude;
-      lon = _currentGpsPosition?.longitude ?? checkpoint.longitude;
-      accuracy = _currentGpsPosition?.accuracy ?? 5.0;
+      lat = position.latitude;
+      lon = position.longitude;
+      accuracy = position.accuracy;
     }
 
     // Proteksi Anti-Mock Location (GPS Spoofing)
@@ -472,11 +499,29 @@ class RondaProvider extends ChangeNotifier {
       return false;
     }
 
-    // 1. Generate QR Payload bertanda waktu pos fisik
-    final qrPayload = QrTokenVerifier.generateQrPayload(
-      checkpointId: checkpoint.id,
+    // Check-in operasional wajib membawa QR pos yang benar-benar dipindai.
+    final qrPayload = simulateProximity
+        ? QrTokenVerifier.generateQrPayload(
+            checkpointId: checkpoint.id,
+            secretKey: checkpoint.secretKey,
+          )
+        : scannedQrPayload?.trim();
+    if (qrPayload == null || qrPayload.isEmpty) {
+      _lastErrorMessage = 'Pindai QR fisik pos terlebih dahulu.';
+      notifyListeners();
+      return false;
+    }
+
+    final qrResult = QrTokenVerifier.verifyPayload(
+      payload: qrPayload,
+      expectedCheckpointId: checkpoint.id,
       secretKey: checkpoint.secretKey,
     );
+    if (!qrResult.isValid) {
+      _lastErrorMessage = qrResult.rejectionReason ?? 'QR pos tidak valid.';
+      notifyListeners();
+      return false;
+    }
 
     // 2. Evaluasi Geofence terlebih dahulu
     final geofence = HaversineCalculator.verifyGeofence(
@@ -510,7 +555,8 @@ class RondaProvider extends ChangeNotifier {
         batteryLevel: 85.0,
       );
       _offlineQueue.enqueue(offlineItem);
-      _lastSuccessMessage = 'Blank spot: Check-in ${checkpoint.namaLokasi} disimpan di antrean lokal.';
+      _lastSuccessMessage =
+          'Blank spot: Check-in ${checkpoint.namaLokasi} disimpan di antrean lokal.';
     } else {
       try {
         final checkin = _backend.submitCheckin(
@@ -529,7 +575,8 @@ class RondaProvider extends ChangeNotifier {
           unawaited(_supabase.insertCheckin(checkin));
         }
 
-        _lastSuccessMessage = 'Berhasil! Check-in terverifikasi di ${checkpoint.namaLokasi} (Jarak GPS: ${geofence.distanceMeters.toStringAsFixed(1)}m)';
+        _lastSuccessMessage =
+            'Berhasil! Check-in terverifikasi di ${checkpoint.namaLokasi} (Jarak GPS: ${geofence.distanceMeters.toStringAsFixed(1)}m)';
       } catch (e) {
         _lastErrorMessage = e.toString().replaceAll('StateError: ', '');
         notifyListeners();
@@ -567,7 +614,8 @@ class RondaProvider extends ChangeNotifier {
         unawaited(_supabase.insertEmergency(event));
       }
 
-      _lastSuccessMessage = 'ALARM DARURAT DIAKTIFKAN! Notifikasi sirine dipancarkan ke seluruh petugas.';
+      _lastSuccessMessage =
+          'ALARM DARURAT DIAKTIFKAN! Notifikasi sirine dipancarkan ke seluruh petugas.';
       notifyListeners();
       return event;
     } catch (e) {
@@ -589,11 +637,13 @@ class RondaProvider extends ChangeNotifier {
       );
 
       if (_supabase.isAvailable) {
-        final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
+        final event =
+            _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
         unawaited(_supabase.updateEmergency(event));
       }
 
-      _lastSuccessMessage = 'Anda telah menyatakan merespons insiden. Segera menuju ke lokasi warga.';
+      _lastSuccessMessage =
+          'Anda telah menyatakan merespons insiden. Segera menuju ke lokasi warga.';
       notifyListeners();
     } catch (e) {
       _lastErrorMessage = e.toString().replaceAll('StateError: ', '');
@@ -616,15 +666,20 @@ class RondaProvider extends ChangeNotifier {
       );
 
       if (_supabase.isAvailable) {
-        final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
+        final event =
+            _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
         unawaited(_supabase.updateEmergency(event));
       }
 
-      _lastSuccessMessage = 'Validasi QR Berhasil! Status darurat resmi dinyatakan SELESAI.';
+      _lastSuccessMessage =
+          'Validasi QR Berhasil! Status darurat resmi dinyatakan SELESAI.';
       notifyListeners();
       return true;
     } catch (e) {
-      _lastErrorMessage = e.toString().replaceAll('ArgumentError: ', '').replaceAll('StateError: ', '');
+      _lastErrorMessage = e
+          .toString()
+          .replaceAll('ArgumentError: ', '')
+          .replaceAll('StateError: ', '');
       notifyListeners();
       return false;
     }
@@ -647,11 +702,13 @@ class RondaProvider extends ChangeNotifier {
       );
 
       if (_supabase.isAvailable) {
-        final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
+        final event =
+            _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
         unawaited(_supabase.updateEmergency(event));
       }
 
-      _lastSuccessMessage = 'Bukti foto terkirim! Status saat ini: MENUNGGU VERIFIKASI KETUA RT.';
+      _lastSuccessMessage =
+          'Bukti foto terkirim! Status saat ini: MENUNGGU VERIFIKASI KETUA RT.';
       notifyListeners();
       return true;
     } catch (e) {
@@ -681,7 +738,8 @@ class RondaProvider extends ChangeNotifier {
       );
 
       if (_supabase.isAvailable) {
-        final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
+        final event =
+            _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
         unawaited(_supabase.updateEmergency(event));
       }
 
@@ -706,11 +764,13 @@ class RondaProvider extends ChangeNotifier {
       );
 
       if (_supabase.isAvailable) {
-        final event = _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
+        final event =
+            _backend.emergencyEvents.firstWhere((e) => e.id == eventId);
         unawaited(_supabase.updateEmergency(event));
       }
 
-      _lastSuccessMessage = 'Alarm darurat telah dibatalkan secara mandiri oleh pelapor.';
+      _lastSuccessMessage =
+          'Alarm darurat telah dibatalkan secara mandiri oleh pelapor.';
       notifyListeners();
     } catch (e) {
       _lastErrorMessage = e.toString().replaceAll('StateError: ', '');
@@ -746,7 +806,8 @@ class RondaProvider extends ChangeNotifier {
       unawaited(_supabase.insertIncident(report));
     }
 
-    _lastSuccessMessage = 'Laporan insiden berhasil dikirim ke Linimasa Keamanan RT.';
+    _lastSuccessMessage =
+        'Laporan insiden berhasil dikirim ke Linimasa Keamanan RT.';
     notifyListeners();
   }
 
@@ -779,7 +840,8 @@ class RondaProvider extends ChangeNotifier {
         unawaited(_supabase.insertShiftSwap(swap));
       }
 
-      _lastSuccessMessage = 'Permintaan tukar jadwal terkirim ke petugas pengganti.';
+      _lastSuccessMessage =
+          'Permintaan tukar jadwal terkirim ke petugas pengganti.';
       notifyListeners();
     } catch (e) {
       _lastErrorMessage = e.toString();
@@ -800,7 +862,8 @@ class RondaProvider extends ChangeNotifier {
         final swap = _backend.shiftSwaps.firstWhere((s) => s.id == requestId);
         unawaited(_supabase.updateShiftSwap(swap));
         if (isAccepted && _currentUser != null) {
-          unawaited(_supabase.upsertSchedules(_backend.getSchedules(_currentUser!.rtId)));
+          unawaited(_supabase
+              .upsertSchedules(_backend.getSchedules(_currentUser!.rtId)));
         }
       }
 
@@ -827,7 +890,8 @@ class RondaProvider extends ChangeNotifier {
         final swap = _backend.shiftSwaps.firstWhere((s) => s.id == requestId);
         unawaited(_supabase.updateShiftSwap(swap));
         if (isApproved && _currentUser != null) {
-          unawaited(_supabase.upsertSchedules(_backend.getSchedules(_currentUser!.rtId)));
+          unawaited(_supabase
+              .upsertSchedules(_backend.getSchedules(_currentUser!.rtId)));
         }
       }
 
@@ -855,7 +919,8 @@ class RondaProvider extends ChangeNotifier {
     bool isLibur = false,
   }) {
     if (_currentUser == null || _currentUser!.role != UserRole.adminRt) {
-      _lastErrorMessage = 'Hanya Ketua RT yang memiliki akses manajemen jadwal.';
+      _lastErrorMessage =
+          'Hanya Ketua RT yang memiliki akses manajemen jadwal.';
       notifyListeners();
       return;
     }
@@ -875,7 +940,8 @@ class RondaProvider extends ChangeNotifier {
         unawaited(_supabase.upsertSchedule(sched));
       }
 
-      _lastSuccessMessage = 'Jadwal berhasil ditetapkan untuk petugas terpilih.';
+      _lastSuccessMessage =
+          'Jadwal berhasil ditetapkan untuk petugas terpilih.';
       notifyListeners();
     } catch (e) {
       _lastErrorMessage = e.toString();
@@ -959,7 +1025,8 @@ class RondaProvider extends ChangeNotifier {
         unawaited(_supabase.insertNotification(_backend.notifications.first));
       }
 
-      _lastSuccessMessage = 'Pemberitahuan peringatan check-in telah terkirim ke petugas patroli.';
+      _lastSuccessMessage =
+          'Pemberitahuan peringatan check-in telah terkirim ke petugas patroli.';
       notifyListeners();
     } catch (e) {
       _lastErrorMessage = e.toString();

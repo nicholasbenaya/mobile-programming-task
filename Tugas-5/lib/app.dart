@@ -8,6 +8,7 @@ import 'presentation/screens/auth/ronda_login_screen.dart';
 import 'presentation/screens/ronda/admin_rt_dashboard.dart';
 import 'presentation/screens/ronda/petugas_ronda_dashboard.dart';
 import 'presentation/screens/ronda/warga_dashboard.dart';
+import 'presentation/navigation/app_scroll_behavior.dart';
 import 'providers/ronda_provider.dart';
 
 class RondaDigitalApp extends StatelessWidget {
@@ -20,6 +21,7 @@ class RondaDigitalApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Ronda Digital - Siskamling Modern',
         debugShowCheckedModeBanner: false,
+        scrollBehavior: const AppScrollBehavior(),
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.system,

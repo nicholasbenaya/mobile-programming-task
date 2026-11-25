@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -21,7 +23,9 @@ class AdminRtDashboard extends StatelessWidget {
 
     final activeSos = ronda.emergencyEvents.where((e) => e.isActive).toList();
     final pendingSwaps = ronda.shiftSwaps
-        .where((s) => s.status == ShiftSwapStatus.acceptedByTarget || s.status == ShiftSwapStatus.pending)
+        .where((s) =>
+            s.status == ShiftSwapStatus.acceptedByTarget ||
+            s.status == ShiftSwapStatus.pending)
         .toList();
     final onDutyOfficers = ronda.onDutyOfficersToday;
     final overdueCps = ronda.overdueCheckpoints;
@@ -37,7 +41,8 @@ class AdminRtDashboard extends StatelessWidget {
             ),
             Text(
               'Ketua RT: ${user.namaLengkap} - RT 04 / RW 02',
-              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                  fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -59,16 +64,19 @@ class AdminRtDashboard extends StatelessWidget {
         children: [
           // Banner Notifikasi Sukses / Error
           if (ronda.lastErrorMessage != null) ...[
-            _buildNotificationBanner(context, ronda.lastErrorMessage!, isError: true),
+            _buildNotificationBanner(context, ronda.lastErrorMessage!,
+                isError: true),
             const SizedBox(height: 12),
           ],
           if (ronda.lastSuccessMessage != null) ...[
-            _buildNotificationBanner(context, ronda.lastSuccessMessage!, isError: false),
+            _buildNotificationBanner(context, ronda.lastSuccessMessage!,
+                isError: false),
             const SizedBox(height: 12),
           ],
 
           // 1. Ringkasan Status Keamanan Wilayah
-          _buildSummaryCards(context, ronda, activeSos.length, pendingSwaps.length, onDutyOfficers.length),
+          _buildSummaryCards(context, ronda, activeSos.length,
+              pendingSwaps.length, onDutyOfficers.length),
           const SizedBox(height: 16),
 
           // 2. Peta Interaktif Patroli Wilayah RT
@@ -117,11 +125,14 @@ class AdminRtDashboard extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Konfirmasi Keluar'),
-        content: const Text('Apakah Anda yakin ingin keluar dari sesi Ketua RT?'),
+        content:
+            const Text('Apakah Anda yakin ingin keluar dari sesi Ketua RT?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
+            style:
+                FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
             onPressed: () {
               Navigator.pop(ctx);
               ronda.logout();
@@ -133,13 +144,16 @@ class AdminRtDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildNotificationBanner(BuildContext context, String text, {required bool isError}) {
+  Widget _buildNotificationBanner(BuildContext context, String text,
+      {required bool isError}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: isError ? AppColors.emergencyLight : AppColors.verifiedLight,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: isError ? AppColors.emergency : AppColors.verified, width: 1),
+        border: Border.all(
+            color: isError ? AppColors.emergency : AppColors.verified,
+            width: 1),
       ),
       child: Row(
         children: [
@@ -164,7 +178,8 @@ class AdminRtDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryCards(BuildContext context, RondaProvider ronda, int activeSosCount, int pendingSwapCount, int onDutyCount) {
+  Widget _buildSummaryCards(BuildContext context, RondaProvider ronda,
+      int activeSosCount, int pendingSwapCount, int onDutyCount) {
     return Row(
       children: [
         Expanded(
@@ -173,7 +188,8 @@ class AdminRtDashboard extends StatelessWidget {
             value: activeSosCount.toString(),
             subtitle: activeSosCount > 0 ? 'Perlu Respons' : 'Aman',
             icon: Icons.warning_amber_rounded,
-            color: activeSosCount > 0 ? AppColors.emergency : AppColors.verified,
+            color:
+                activeSosCount > 0 ? AppColors.emergency : AppColors.verified,
           ),
         ),
         const SizedBox(width: 10),
@@ -193,7 +209,8 @@ class AdminRtDashboard extends StatelessWidget {
             value: pendingSwapCount.toString(),
             subtitle: pendingSwapCount > 0 ? 'Menunggu Approval' : 'Selesai',
             icon: Icons.swap_horiz,
-            color: pendingSwapCount > 0 ? AppColors.secondary : AppColors.verified,
+            color:
+                pendingSwapCount > 0 ? AppColors.secondary : AppColors.verified,
           ),
         ),
       ],
@@ -201,7 +218,8 @@ class AdminRtDashboard extends StatelessWidget {
   }
 
   /// Kejelasan Jadwal: Menampilkan siapa yang seharusnya sedang berjaga hari ini
-  Widget _buildTonightRosterCard(BuildContext context, RondaProvider ronda, List<RondaUser> onDutyOfficers) {
+  Widget _buildTonightRosterCard(BuildContext context, RondaProvider ronda,
+      List<RondaUser> onDutyOfficers) {
     final now = DateTime.now();
     final todaySchedules = ronda.getSchedulesForDate(now);
 
@@ -213,7 +231,8 @@ class AdminRtDashboard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.badge, color: AppColors.patrolAccent, size: 20),
+                const Icon(Icons.badge,
+                    color: AppColors.patrolAccent, size: 20),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
@@ -231,7 +250,8 @@ class AdminRtDashboard extends StatelessWidget {
                     mode: CalendarDialogMode.adminAssign,
                   ),
                   icon: const Icon(Icons.calendar_month, size: 16),
-                  label: const Text('Atur di Kalender', style: TextStyle(fontSize: 11)),
+                  label: const Text('Atur di Kalender',
+                      style: TextStyle(fontSize: 11)),
                 ),
               ],
             ),
@@ -245,12 +265,14 @@ class AdminRtDashboard extends StatelessWidget {
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.info_outline, color: AppColors.patrolAccent, size: 18),
+                    Icon(Icons.info_outline,
+                        color: AppColors.patrolAccent, size: 18),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Peringatan: Belum ada petugas yang dijadwalkan piket hari ini. Gunakan kalender di bawah untuk mengatur jadwal.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF78350F)),
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF78350F)),
                       ),
                     ),
                   ],
@@ -265,19 +287,26 @@ class AdminRtDashboard extends StatelessWidget {
                 itemBuilder: (context, idx) {
                   final s = todaySchedules[idx];
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: s.isLibur ? Colors.grey.shade100 : AppColors.patrolAccentLight.withValues(alpha: 0.3),
+                      color: s.isLibur
+                          ? Colors.grey.shade100
+                          : AppColors.patrolAccentLight.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: s.isLibur ? Colors.grey.shade300 : AppColors.patrolAccent.withValues(alpha: 0.4),
+                        color: s.isLibur
+                            ? Colors.grey.shade300
+                            : AppColors.patrolAccent.withValues(alpha: 0.4),
                       ),
                     ),
                     child: Row(
                       children: [
                         CircleAvatar(
                           radius: 14,
-                          backgroundColor: s.isLibur ? Colors.grey.shade400 : AppColors.primaryLight,
+                          backgroundColor: s.isLibur
+                              ? Colors.grey.shade400
+                              : AppColors.primaryLight,
                           child: Icon(
                             s.isLibur ? Icons.hotel : Icons.person,
                             size: 14,
@@ -289,22 +318,32 @@ class AdminRtDashboard extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(s.petugasName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text(s.petugasName,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13)),
                               Text(
                                 s.shiftName,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: s.isLibur ? Colors.grey.shade700 : AppColors.patrolAccent,
-                                  fontWeight: s.isLibur ? FontWeight.normal : FontWeight.w600,
+                                  color: s.isLibur
+                                      ? Colors.grey.shade700
+                                      : AppColors.patrolAccent,
+                                  fontWeight: s.isLibur
+                                      ? FontWeight.normal
+                                      : FontWeight.w600,
                                 ),
                               ),
                             ],
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: s.isLibur ? Colors.grey.shade300 : AppColors.verifiedLight,
+                            color: s.isLibur
+                                ? Colors.grey.shade300
+                                : AppColors.verifiedLight,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -312,7 +351,9 @@ class AdminRtDashboard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              color: s.isLibur ? Colors.grey.shade800 : AppColors.verified,
+                              color: s.isLibur
+                                  ? Colors.grey.shade800
+                                  : AppColors.verified,
                             ),
                           ),
                         ),
@@ -328,7 +369,8 @@ class AdminRtDashboard extends StatelessWidget {
   }
 
   /// Pengawasan Pos Patroli & Kemampuan Peringatan Manual Check-in oleh Ketua RT
-  Widget _buildCheckpointSupervisionCard(BuildContext context, RondaProvider ronda, List<Checkpoint> overdueCps) {
+  Widget _buildCheckpointSupervisionCard(
+      BuildContext context, RondaProvider ronda, List<Checkpoint> overdueCps) {
     final checkpoints = ronda.checkpoints;
 
     return Card(
@@ -339,7 +381,8 @@ class AdminRtDashboard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.checklist_rtl, color: AppColors.secondary, size: 20),
+                const Icon(Icons.checklist_rtl,
+                    color: AppColors.secondary, size: 20),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
@@ -349,14 +392,18 @@ class AdminRtDashboard extends StatelessWidget {
                 ),
                 if (overdueCps.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppColors.emergencyLight,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       '${overdueCps.length} Pos Terlewat',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.emergency),
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.emergency),
                     ),
                   ),
               ],
@@ -390,18 +437,24 @@ class AdminRtDashboard extends StatelessWidget {
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: isOverdue ? AppColors.emergencyLight : Colors.transparent,
+                  color:
+                      isOverdue ? AppColors.emergencyLight : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isOverdue ? AppColors.emergency.withValues(alpha: 0.5) : Colors.grey.shade300,
+                    color: isOverdue
+                        ? AppColors.emergency.withValues(alpha: 0.5)
+                        : Colors.grey.shade300,
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      status == CheckpointScheduleStatus.selesai ? Icons.check_circle : Icons.timer,
+                      status == CheckpointScheduleStatus.selesai
+                          ? Icons.check_circle
+                          : Icons.timer,
                       size: 16,
                       color: badgeColor,
                     ),
@@ -410,31 +463,43 @@ class AdminRtDashboard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${cp.kodeTitik} - ${cp.namaLokasi}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          Text('Target: ${cp.targetWaktuCheckin} WIB (Toleransi ${cp.windowMenitSetelah}m)', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                          Text('${cp.kodeTitik} - ${cp.namaLokasi}',
+                              style: const TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.bold)),
+                          Text(
+                              'Target: ${cp.targetWaktuCheckin} WIB (Toleransi ${cp.windowMenitSetelah}m)',
+                              style: const TextStyle(
+                                  fontSize: 10, color: Colors.grey)),
                         ],
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: badgeColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         badgeText,
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeColor),
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: badgeColor),
                       ),
                     ),
                     const SizedBox(width: 8),
                     // Tombol Notify Manual RT
                     IconButton(
                       tooltip: 'Peringatkan Petugas Check-in',
-                      icon: const Icon(Icons.notification_add, size: 18, color: AppColors.patrolAccent),
+                      icon: const Icon(Icons.notification_add,
+                          size: 18, color: AppColors.patrolAccent),
                       onPressed: () {
                         ronda.notifyCheckpointReminder(checkpointId: cp.id);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Peringatan check-in untuk ${cp.kodeTitik} telah dikirim ke petugas.')),
+                          SnackBar(
+                              content: Text(
+                                  'Peringatan check-in untuk ${cp.kodeTitik} telah dikirim ke petugas.')),
                         );
                       },
                     ),
@@ -448,13 +513,15 @@ class AdminRtDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildActiveSosSection(BuildContext context, RondaProvider ronda, List<EmergencyEvent> list) {
+  Widget _buildActiveSosSection(
+      BuildContext context, RondaProvider ronda, List<EmergencyEvent> list) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(Icons.notification_important, color: AppColors.emergency, size: 22),
+            const Icon(Icons.notification_important,
+                color: AppColors.emergency, size: 22),
             const SizedBox(width: 8),
             const Text(
               'Manajemen Insiden Darurat (SOS)',
@@ -469,7 +536,10 @@ class AdminRtDashboard extends StatelessWidget {
               ),
               child: Text(
                 '${list.length} Kejadian',
-                style: const TextStyle(color: AppColors.emergency, fontWeight: FontWeight.bold, fontSize: 11),
+                style: const TextStyle(
+                    color: AppColors.emergency,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11),
               ),
             ),
           ],
@@ -480,7 +550,8 @@ class AdminRtDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildSosCard(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
+  Widget _buildSosCard(
+      BuildContext context, RondaProvider ronda, EmergencyEvent event) {
     Color statusColor;
     String statusTitle;
     IconData statusIcon;
@@ -555,7 +626,10 @@ class AdminRtDashboard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'Catatan: "${event.catatan}"',
-                style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey),
               ),
             ],
             const SizedBox(height: 10),
@@ -563,7 +637,8 @@ class AdminRtDashboard extends StatelessWidget {
             // Petugas yang merespons
             if (event.respondedByUserName != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -575,7 +650,10 @@ class AdminRtDashboard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         'Petugas Penangan: ${event.respondedByUserName}',
-                        style: TextStyle(fontSize: 12, color: Colors.blue.shade900, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue.shade900,
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
@@ -591,9 +669,12 @@ class AdminRtDashboard extends StatelessWidget {
                   backgroundColor: AppColors.emergencyLight,
                   foregroundColor: AppColors.emergency,
                 ),
-                onPressed: () => _showBroadcastOfficerDialog(context, ronda, event),
+                onPressed: () =>
+                    _showBroadcastOfficerDialog(context, ronda, event),
                 icon: const Icon(Icons.campaign, size: 18),
-                label: const Text('Broadcast Peringatan ke Semua Petugas', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                label: const Text('Broadcast Peringatan ke Semua Petugas',
+                    style:
+                        TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
             ),
 
@@ -612,26 +693,33 @@ class AdminRtDashboard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.photo_camera, size: 18, color: Colors.purple.shade800),
+                        Icon(Icons.photo_camera,
+                            size: 18, color: Colors.purple.shade800),
                         const SizedBox(width: 8),
                         Text(
                           'Bukti Foto Lapangan Petugas:',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.purple.shade900),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.purple.shade900),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Text(
                       'Keterangan: ${event.resolutionNotes ?? "-"}\nFile: ${event.resolutionPhotoPath}',
-                      style: TextStyle(fontSize: 12, color: Colors.purple.shade800),
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.purple.shade800),
                     ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(foregroundColor: AppColors.emergency),
-                            onPressed: () => _handleAdminVerification(context, ronda, event, false),
+                            style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.emergency),
+                            onPressed: () => _handleAdminVerification(
+                                context, ronda, event, false),
                             icon: const Icon(Icons.close, size: 16),
                             label: const Text('Tolak Laporan'),
                           ),
@@ -639,8 +727,10 @@ class AdminRtDashboard extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton.icon(
-                            style: FilledButton.styleFrom(backgroundColor: Colors.purple),
-                            onPressed: () => _handleAdminVerification(context, ronda, event, true),
+                            style: FilledButton.styleFrom(
+                                backgroundColor: Colors.purple),
+                            onPressed: () => _handleAdminVerification(
+                                context, ronda, event, true),
                             icon: const Icon(Icons.check, size: 16),
                             label: const Text('Setujui (Selesai)'),
                           ),
@@ -658,10 +748,12 @@ class AdminRtDashboard extends StatelessWidget {
   }
 
   /// Dialog Broadcast Panggilan Siaga Ketua RT
-  void _showBroadcastOfficerDialog(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
+  void _showBroadcastOfficerDialog(
+      BuildContext context, RondaProvider ronda, EmergencyEvent event) {
     bool includeOffDuty = true;
     final messageController = TextEditingController(
-      text: 'PERINTAH KETUA RT: Panggilan darurat aktif di ${event.userAddress} (Pelapor: ${event.userName}). Seluruh personel siaga!',
+      text:
+          'PERINTAH KETUA RT: Panggilan darurat aktif di ${event.userAddress} (Pelapor: ${event.userName}). Seluruh personel siaga!',
     );
 
     showDialog(
@@ -673,7 +765,8 @@ class AdminRtDashboard extends StatelessWidget {
               children: [
                 Icon(Icons.campaign, color: AppColors.emergency),
                 SizedBox(width: 8),
-                Text('Peringatkan Petugas Ronda', style: TextStyle(fontSize: 16)),
+                Text('Peringatkan Petugas Ronda',
+                    style: TextStyle(fontSize: 16)),
               ],
             ),
             content: Column(
@@ -687,8 +780,12 @@ class AdminRtDashboard extends StatelessWidget {
                 const SizedBox(height: 10),
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Sertakan Petugas Cadangan / Sedang Libur', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Jika dicentang, semua petugas ronda terdaftar akan menerima peringatan darurat ini.', style: TextStyle(fontSize: 10)),
+                  title: const Text('Sertakan Petugas Cadangan / Sedang Libur',
+                      style:
+                          TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  subtitle: const Text(
+                      'Jika dicentang, semua petugas ronda terdaftar akan menerima peringatan darurat ini.',
+                      style: TextStyle(fontSize: 10)),
                   value: includeOffDuty,
                   onChanged: (val) {
                     if (val != null) setDialogState(() => includeOffDuty = val);
@@ -706,9 +803,12 @@ class AdminRtDashboard extends StatelessWidget {
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Batal')),
               FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: AppColors.emergency),
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.emergency),
                 onPressed: () {
                   Navigator.pop(ctx);
                   ronda.broadcastSosToOfficers(
@@ -717,7 +817,9 @@ class AdminRtDashboard extends StatelessWidget {
                     customMessage: messageController.text.trim(),
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Peringatan darurat berhasil dipancarkan ke seluruh petugas ronda!')),
+                    const SnackBar(
+                        content: Text(
+                            'Peringatan darurat berhasil dipancarkan ke seluruh petugas ronda!')),
                   );
                 },
                 child: const Text('Kirim Peringatan'),
@@ -729,12 +831,15 @@ class AdminRtDashboard extends StatelessWidget {
     );
   }
 
-  void _handleAdminVerification(BuildContext context, RondaProvider ronda, EmergencyEvent event, bool isApproved) {
+  void _handleAdminVerification(BuildContext context, RondaProvider ronda,
+      EmergencyEvent event, bool isApproved) {
     final notesController = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(isApproved ? 'Konfirmasi Verifikasi Laporan' : 'Tolak & Kembalikan ke Petugas'),
+        title: Text(isApproved
+            ? 'Konfirmasi Verifikasi Laporan'
+            : 'Tolak & Kembalikan ke Petugas'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -756,17 +861,21 @@ class AdminRtDashboard extends StatelessWidget {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: isApproved ? AppColors.verified : AppColors.emergency,
+              backgroundColor:
+                  isApproved ? AppColors.verified : AppColors.emergency,
             ),
             onPressed: () {
               Navigator.pop(ctx);
               ronda.adminVerifyEmergency(
                 eventId: event.id,
                 isApproved: isApproved,
-                adminNotes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                adminNotes: notesController.text.trim().isEmpty
+                    ? null
+                    : notesController.text.trim(),
               );
             },
             child: Text(isApproved ? 'Setujui (Selesai)' : 'Tolak'),
@@ -810,7 +919,8 @@ class AdminRtDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildShiftSwapSection(BuildContext context, RondaProvider ronda, List<ShiftSwapRequest> list) {
+  Widget _buildShiftSwapSection(
+      BuildContext context, RondaProvider ronda, List<ShiftSwapRequest> list) {
     final allSwaps = ronda.shiftSwaps;
 
     return Column(
@@ -826,7 +936,8 @@ class AdminRtDashboard extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
-            Text('${allSwaps.length} Entri', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text('${allSwaps.length} Entri',
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
         const SizedBox(height: 6),
@@ -840,7 +951,9 @@ class AdminRtDashboard extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Center(
-                child: Text('Belum ada riwayat mutasi / pertukaran jadwal antar petugas.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                child: Text(
+                    'Belum ada riwayat mutasi / pertukaran jadwal antar petugas.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             ),
           )
@@ -880,19 +993,25 @@ class AdminRtDashboard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             '${req.requesterName} ➔ ${req.targetUserName}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: statusColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+                            border: Border.all(
+                                color: statusColor.withValues(alpha: 0.5)),
                           ),
                           child: Text(
                             statusText,
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: statusColor),
                           ),
                         ),
                       ],
@@ -908,7 +1027,10 @@ class AdminRtDashboard extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 2),
                         child: Text(
                           'Alasan: "${req.alasan}"',
-                          style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey),
                         ),
                       ),
                   ],
@@ -920,7 +1042,8 @@ class AdminRtDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildResolvedSosAuditSection(BuildContext context, RondaProvider ronda) {
+  Widget _buildResolvedSosAuditSection(
+      BuildContext context, RondaProvider ronda) {
     final resolvedList = ronda.resolvedEmergencies;
 
     return Column(
@@ -928,7 +1051,8 @@ class AdminRtDashboard extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.verified_user, color: AppColors.verified, size: 22),
+            const Icon(Icons.verified_user,
+                color: AppColors.verified, size: 22),
             const SizedBox(width: 8),
             const Expanded(
               child: Text(
@@ -936,7 +1060,8 @@ class AdminRtDashboard extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
-            Text('${resolvedList.length} Selesai', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text('${resolvedList.length} Selesai',
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
         const SizedBox(height: 10),
@@ -945,7 +1070,9 @@ class AdminRtDashboard extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Center(
-                child: Text('Belum ada riwayat insiden darurat yang diselesaikan.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                child: Text(
+                    'Belum ada riwayat insiden darurat yang diselesaikan.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             ),
           )
@@ -968,39 +1095,53 @@ class AdminRtDashboard extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: AppColors.verifiedLight,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             'SELESAI - ${event.resolvedVia?.label ?? "Verifikasi"}',
-                            style: const TextStyle(color: AppColors.verified, fontWeight: FontWeight.bold, fontSize: 10),
+                            style: const TextStyle(
+                                color: AppColors.verified,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10),
                           ),
                         ),
                         const Spacer(),
                         Text(
-                          event.resolvedAt != null ? DateFormat('dd/MM/yy HH:mm').format(event.resolvedAt!) : '',
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          event.resolvedAt != null
+                              ? DateFormat('dd/MM/yy HH:mm')
+                                  .format(event.resolvedAt!)
+                              : '',
+                          style:
+                              const TextStyle(fontSize: 11, color: Colors.grey),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Text(
                       'Pelapor: ${event.userName} (${event.userAddress})',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Petugas Penangan: ${event.respondedByUserName ?? "-"} • Respon: $durRespond • Penyelesaian: $durResolve',
-                      style: const TextStyle(fontSize: 11, color: Colors.black87),
+                      style:
+                          const TextStyle(fontSize: 11, color: Colors.black87),
                     ),
-                    if (event.resolutionNotes != null && event.resolutionNotes!.isNotEmpty)
+                    if (event.resolutionNotes != null &&
+                        event.resolutionNotes!.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           'Catatan: "${event.resolutionNotes}"',
-                          style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey),
                         ),
                       ),
                   ],
@@ -1027,7 +1168,8 @@ class AdminRtDashboard extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const Spacer(),
-            Text('${ronda.patrolLogs.length} Total', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text('${ronda.patrolLogs.length} Total',
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
         const SizedBox(height: 10),
@@ -1036,14 +1178,19 @@ class AdminRtDashboard extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Center(
-                child: Text('Belum ada data check-in patroli malam ini.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                child: Text('Belum ada data check-in patroli malam ini.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             ),
           )
         else
           ...logs.map((log) {
-            final cp = ronda.checkpoints.where((c) => c.id == log.checkpointId).firstOrNull;
-            final user = ronda.availableUsers.where((u) => u.id == log.userId).firstOrNull;
+            final cp = ronda.checkpoints
+                .where((c) => c.id == log.checkpointId)
+                .firstOrNull;
+            final user = ronda.availableUsers
+                .where((u) => u.id == log.userId)
+                .firstOrNull;
 
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
@@ -1055,7 +1202,8 @@ class AdminRtDashboard extends StatelessWidget {
                 ),
                 title: Text(
                   '${cp?.kodeTitik ?? "POS"} - ${cp?.namaLokasi ?? "Pos Ronda"}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 subtitle: Text(
                   'Petugas: ${user?.namaLengkap ?? log.userId} • Jarak GPS: ${log.distanceMeter.toStringAsFixed(1)}m',
@@ -1063,7 +1211,10 @@ class AdminRtDashboard extends StatelessWidget {
                 ),
                 trailing: Text(
                   DateFormat('HH:mm').format(log.scannedAt),
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey),
                 ),
               ),
             );
@@ -1082,12 +1233,17 @@ class AdminRtDashboard extends StatelessWidget {
           children: [
             const Icon(Icons.photo_library, color: Colors.deepOrange, size: 22),
             const SizedBox(width: 8),
-            const Text(
-              'Laporan Insiden Berfoto Warga & Petugas',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            const Expanded(
+              child: Text(
+                'Laporan Insiden Berfoto Warga & Petugas',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ),
-            const Spacer(),
-            Text('${incidents.length} Laporan', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(width: 8),
+            Text('${incidents.length} Laporan',
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
         const SizedBox(height: 10),
@@ -1096,7 +1252,8 @@ class AdminRtDashboard extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Center(
-                child: Text('Belum ada laporan insiden berfoto.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                child: Text('Belum ada laporan insiden berfoto.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             ),
           )
@@ -1109,24 +1266,41 @@ class AdminRtDashboard extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(inc.photoPath),
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        cacheWidth: 128,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 64,
+                          height: 64,
+                          color: Colors.grey.shade200,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.image_not_supported_outlined,
+                              color: Colors.grey),
+                        ),
                       ),
-                      child: const Icon(Icons.image, color: Colors.grey),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(inc.category.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.deepOrange)),
-                          Text(inc.keterangan, style: const TextStyle(fontSize: 12)),
+                          Text(inc.category.label,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Colors.deepOrange)),
+                          Text(inc.keterangan,
+                              style: const TextStyle(fontSize: 12)),
                           const SizedBox(height: 4),
-                          Text('Pelapor: ${inc.reporterName} • ${DateFormat("HH:mm").format(inc.createdAt)}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                          Text(
+                              'Pelapor: ${inc.reporterName} • ${DateFormat("HH:mm").format(inc.createdAt)}',
+                              style: const TextStyle(
+                                  fontSize: 10, color: Colors.grey)),
                         ],
                       ),
                     ),
@@ -1169,13 +1343,18 @@ class _StatCard extends StatelessWidget {
                 const Spacer(),
                 Text(
                   value,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+                  style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold, color: color),
                 ),
               ],
             ),
             const SizedBox(height: 6),
-            Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-            Text(subtitle, style: const TextStyle(fontSize: 10, color: Colors.grey), overflow: TextOverflow.ellipsis),
+            Text(title,
+                style:
+                    const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            Text(subtitle,
+                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                overflow: TextOverflow.ellipsis),
           ],
         ),
       ),

@@ -33,9 +33,11 @@ class _WargaDashboardState extends State<WargaDashboard> {
         title: const Text('Konfirmasi Keluar'),
         content: const Text('Apakah Anda yakin ingin keluar dari sesi Warga?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
+            style:
+                FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
             onPressed: () {
               Navigator.pop(ctx);
               ronda.logout();
@@ -65,7 +67,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
             ),
             Text(
               user.alamatRumah,
-              style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                  fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -91,7 +94,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
             const SizedBox(height: 12),
           ],
           if (ronda.lastSuccessMessage != null) ...[
-            _buildNotification(context, ronda.lastSuccessMessage!, isError: false),
+            _buildNotification(context, ronda.lastSuccessMessage!,
+                isError: false),
             const SizedBox(height: 12),
           ],
 
@@ -132,13 +136,15 @@ class _WargaDashboardState extends State<WargaDashboard> {
     );
   }
 
-  Widget _buildNotification(BuildContext context, String text, {required bool isError}) {
+  Widget _buildNotification(BuildContext context, String text,
+      {required bool isError}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: isError ? AppColors.emergencyLight : AppColors.verifiedLight,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: isError ? AppColors.emergency : AppColors.verified),
+        border: Border.all(
+            color: isError ? AppColors.emergency : AppColors.verified),
       ),
       child: Row(
         children: [
@@ -164,7 +170,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
   }
 
   /// Tampilan Saat Warga Sedang Menyalakan Tombol Panik (Menampilkan QR Verifikasi Milik Warga)
-  Widget _buildActiveEmergencyCard(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
+  Widget _buildActiveEmergencyCard(
+      BuildContext context, RondaProvider ronda, EmergencyEvent event) {
     Color badgeColor;
     String badgeText;
 
@@ -175,7 +182,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
         break;
       case EmergencyStatus.onGoing:
         badgeColor = AppColors.patrolAccent;
-        badgeText = 'SEDANG DIRESPONS (Petugas ${event.respondedByUserName ?? ""} Menuju Rumah Anda)';
+        badgeText =
+            'SEDANG DIRESPONS (Petugas ${event.respondedByUserName ?? ""} Menuju Rumah Anda)';
         break;
       case EmergencyStatus.menungguVerifikasiRt:
         badgeColor = Colors.purple;
@@ -198,15 +206,20 @@ class _WargaDashboardState extends State<WargaDashboard> {
           children: [
             Row(
               children: [
-                const Icon(Icons.crisis_alert, color: AppColors.emergency, size: 26),
+                const Icon(Icons.crisis_alert,
+                    color: AppColors.emergency, size: 26),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
                     'ALARM DARURAT ANDA AKTIF',
-                    style: TextStyle(color: AppColors.emergency, fontWeight: FontWeight.bold, fontSize: 15),
+                    style: TextStyle(
+                        color: AppColors.emergency,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15),
                   ),
                 ),
-                Text(DateFormat('HH:mm:ss').format(event.triggeredAt), style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                Text(DateFormat('HH:mm:ss').format(event.triggeredAt),
+                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
               ],
             ),
             const SizedBox(height: 10),
@@ -221,7 +234,10 @@ class _WargaDashboardState extends State<WargaDashboard> {
               child: Text(
                 badgeText,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: badgeColor, fontWeight: FontWeight.bold, fontSize: 12),
+                style: TextStyle(
+                    color: badgeColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12),
               ),
             ),
             const SizedBox(height: 16),
@@ -255,7 +271,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
             const SizedBox(height: 8),
             Text(
               'Token: ${event.verificationQrToken}',
-              style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.grey),
+              style: const TextStyle(
+                  fontSize: 10, fontFamily: 'monospace', color: Colors.grey),
             ),
             const SizedBox(height: 16),
 
@@ -267,7 +284,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
               ),
               onPressed: () => _confirmCancelEmergency(context, ronda, event),
               icon: const Icon(Icons.close, size: 16),
-              label: const Text('Batalkan Panggilan Darurat Ini (Salah Tekan)', style: TextStyle(fontSize: 12)),
+              label: const Text('Batalkan Panggilan Darurat Ini (Salah Tekan)',
+                  style: TextStyle(fontSize: 12)),
             ),
           ],
         ),
@@ -275,16 +293,21 @@ class _WargaDashboardState extends State<WargaDashboard> {
     );
   }
 
-  void _confirmCancelEmergency(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
+  void _confirmCancelEmergency(
+      BuildContext context, RondaProvider ronda, EmergencyEvent event) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Batalkan Alarm Darurat?'),
-        content: const Text('Apakah Anda yakin situasi telah terkendali dan ingin mematikan alarm SOS?'),
+        content: const Text(
+            'Apakah Anda yakin situasi telah terkendali dan ingin mematikan alarm SOS?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Kembali')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Kembali')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
+            style:
+                FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
             onPressed: () {
               Navigator.pop(ctx);
               ronda.cancelMyEmergency(event.id);
@@ -314,7 +337,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
             const Text(
               'Tekan tombol merah di bawah ini apabila Anda menghadapi bahaya, pencurian, kebakaran, atau kecurigaan di sekitar rumah.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+              style:
+                  TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
             ),
             const SizedBox(height: 20),
 
@@ -371,7 +395,7 @@ class _WargaDashboardState extends State<WargaDashboard> {
   }
 
   void _showPanicConfirmationDialog(BuildContext context, RondaProvider ronda) {
-    _sosNoteController.text = 'Melihat orang asing memanjat pagar rumah tetangga!';
+    _sosNoteController.clear();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -402,13 +426,16 @@ class _WargaDashboardState extends State<WargaDashboard> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.emergency),
             onPressed: () {
               Navigator.pop(ctx);
               ronda.triggerPanic(
-                catatan: _sosNoteController.text.trim().isEmpty ? null : _sosNoteController.text.trim(),
+                catatan: _sosNoteController.text.trim().isEmpty
+                    ? null
+                    : _sosNoteController.text.trim(),
               );
             },
             child: const Text('BUNYIKAN ALARM'),
@@ -428,7 +455,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
             child: Row(
               children: [
-                const Icon(Icons.location_searching, color: AppColors.secondary, size: 20),
+                const Icon(Icons.location_searching,
+                    color: AppColors.secondary, size: 20),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
@@ -452,7 +480,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
     );
   }
 
-  Widget _buildCivicIncidentReportCard(BuildContext context, RondaProvider ronda) {
+  Widget _buildCivicIncidentReportCard(
+      BuildContext context, RondaProvider ronda) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -461,7 +490,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
           children: [
             Row(
               children: [
-                const Icon(Icons.build_circle_outlined, color: AppColors.patrolAccent, size: 22),
+                const Icon(Icons.build_circle_outlined,
+                    color: AppColors.patrolAccent, size: 22),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
@@ -470,19 +500,25 @@ class _WargaDashboardState extends State<WargaDashboard> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.secondaryContainer,
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text('Non-SOS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary)),
+                  child: const Text('Non-SOS',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.secondary)),
                 ),
               ],
             ),
             const SizedBox(height: 6),
             const Text(
               'Laporkan lampu penerangan jalan mati, fasilitas umum rusak, tumpukan sampah liar, atau saluran got mampet kepada pengurus RT dan petugas patroli.',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+              style:
+                  TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -495,7 +531,9 @@ class _WargaDashboardState extends State<WargaDashboard> {
                 ),
                 onPressed: () => _showReportCivicDialog(context, ronda),
                 icon: const Icon(Icons.add_photo_alternate, size: 18),
-                label: const Text('Buat Laporan Fasilitas / Lingkungan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                label: const Text('Buat Laporan Fasilitas / Lingkungan',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ),
           ],
@@ -525,30 +563,53 @@ class _WargaDashboardState extends State<WargaDashboard> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Pilih Kategori Masalah:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Text('Pilih Kategori Masalah:',
+                      style:
+                          TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<IncidentCategory>(
                     initialValue: selectedCategory,
                     isExpanded: true,
-                    decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                        isDense: true, border: OutlineInputBorder()),
                     items: const [
-                      DropdownMenuItem(value: IncidentCategory.fasilitasRusak, child: Text('Fasilitas Umum Rusak', style: TextStyle(fontSize: 12))),
-                      DropdownMenuItem(value: IncidentCategory.lampuMati, child: Text('Lampu Penerangan Mati', style: TextStyle(fontSize: 12))),
-                      DropdownMenuItem(value: IncidentCategory.sampah, child: Text('Tumpukan Sampah / Saluran Tersumbat', style: TextStyle(fontSize: 12))),
-                      DropdownMenuItem(value: IncidentCategory.orangMencurigakan, child: Text('Aktivitas Mencurigakan', style: TextStyle(fontSize: 12))),
-                      DropdownMenuItem(value: IncidentCategory.lainnya, child: Text('Masalah Lainnya', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(
+                          value: IncidentCategory.fasilitasRusak,
+                          child: Text('Fasilitas Umum Rusak',
+                              style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(
+                          value: IncidentCategory.lampuMati,
+                          child: Text('Lampu Penerangan Mati',
+                              style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(
+                          value: IncidentCategory.sampah,
+                          child: Text('Tumpukan Sampah / Saluran Tersumbat',
+                              style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(
+                          value: IncidentCategory.orangMencurigakan,
+                          child: Text('Aktivitas Mencurigakan',
+                              style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(
+                          value: IncidentCategory.lainnya,
+                          child: Text('Masalah Lainnya',
+                              style: TextStyle(fontSize: 12))),
                     ],
                     onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedCategory = val);
+                      if (val != null) {
+                        setDialogState(() => selectedCategory = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
-                  const Text('Keterangan & Lokasi Kejadian:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Text('Keterangan & Lokasi Kejadian:',
+                      style:
+                          TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: noteController,
                     decoration: const InputDecoration(
-                      hintText: 'Contoh: Lampu tiang no 3 di gang buntu mati sudah 2 hari...',
+                      hintText:
+                          'Contoh: Lampu tiang no 3 di gang buntu mati sudah 2 hari...',
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -570,7 +631,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
                         Expanded(
                           child: Text(
                             'Foto bukti lampiran kamera otomatis disertakan via GPS.',
-                            style: TextStyle(fontSize: 11, color: Colors.black87),
+                            style:
+                                TextStyle(fontSize: 11, color: Colors.black87),
                           ),
                         ),
                       ],
@@ -580,14 +642,18 @@ class _WargaDashboardState extends State<WargaDashboard> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Batal')),
               FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryLight),
                 onPressed: () {
                   final text = noteController.text.trim();
                   if (text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Harap tuliskan keterangan laporan.')),
+                      const SnackBar(
+                          content: Text('Harap tuliskan keterangan laporan.')),
                     );
                     return;
                   }
@@ -595,11 +661,13 @@ class _WargaDashboardState extends State<WargaDashboard> {
                   ronda.reportIncident(
                     category: selectedCategory,
                     keterangan: text,
-                    photoPath: '/storage/emulated/0/DCIM/laporan_warga_${DateTime.now().millisecondsSinceEpoch}.jpg',
+                    photoPath:
+                        '/storage/emulated/0/DCIM/laporan_warga_${DateTime.now().millisecondsSinceEpoch}.jpg',
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Laporan warga berhasil dikirim ke Pengurus RT & Petugas Ronda!'),
+                      content: Text(
+                          'Laporan warga berhasil dikirim ke Pengurus RT & Petugas Ronda!'),
                       backgroundColor: AppColors.verified,
                     ),
                   );
@@ -613,8 +681,11 @@ class _WargaDashboardState extends State<WargaDashboard> {
     );
   }
 
-  Widget _buildCivicIncidentsHistory(BuildContext context, RondaProvider ronda) {
-    final myIncidents = ronda.incidents.where((i) => i.userId == ronda.currentUser?.id).toList();
+  Widget _buildCivicIncidentsHistory(
+      BuildContext context, RondaProvider ronda) {
+    final myIncidents = ronda.incidents
+        .where((i) => i.userId == ronda.currentUser?.id)
+        .toList();
     if (myIncidents.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -629,7 +700,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const Spacer(),
-            Text('${myIncidents.length} Laporan', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            Text('${myIncidents.length} Laporan',
+                style: const TextStyle(fontSize: 11, color: Colors.grey)),
           ],
         ),
         const SizedBox(height: 8),
@@ -644,7 +716,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
                   CircleAvatar(
                     backgroundColor: AppColors.patrolAccentLight,
                     radius: 16,
-                    child: const Icon(Icons.build, size: 16, color: AppColors.patrolAccent),
+                    child: const Icon(Icons.build,
+                        size: 16, color: AppColors.patrolAccent),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -655,19 +728,23 @@ class _WargaDashboardState extends State<WargaDashboard> {
                           children: [
                             Text(
                               report.category.label,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 13),
                             ),
                             const Spacer(),
                             Text(
-                              DateFormat('dd/MM HH:mm').format(report.createdAt),
-                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                              DateFormat('dd/MM HH:mm')
+                                  .format(report.createdAt),
+                              style: const TextStyle(
+                                  fontSize: 10, color: Colors.grey),
                             ),
                           ],
                         ),
                         const SizedBox(height: 3),
                         Text(
                           report.keterangan,
-                          style: const TextStyle(fontSize: 12, color: Colors.black87),
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.black87),
                         ),
                       ],
                     ),
@@ -681,7 +758,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
     );
   }
 
-  Widget _buildResolvedSosAuditSection(BuildContext context, RondaProvider ronda) {
+  Widget _buildResolvedSosAuditSection(
+      BuildContext context, RondaProvider ronda) {
     final resolved = ronda.resolvedEmergencies;
     if (resolved.isEmpty) return const SizedBox.shrink();
 
@@ -700,14 +778,17 @@ class _WargaDashboardState extends State<WargaDashboard> {
         ),
         const SizedBox(height: 8),
         ...resolved.take(2).map((event) {
-          final dur = event.durationToResolve != null ? '${event.durationToResolve!.inMinutes} menit' : '-';
+          final dur = event.durationToResolve != null
+              ? '${event.durationToResolve!.inMinutes} menit'
+              : '-';
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  const Icon(Icons.check_circle, color: AppColors.verified, size: 24),
+                  const Icon(Icons.check_circle,
+                      color: AppColors.verified, size: 24),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -715,11 +796,13 @@ class _WargaDashboardState extends State<WargaDashboard> {
                       children: [
                         Text(
                           'Darurat: ${event.userName} (${event.userAddress})',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                         Text(
                           'Tertangani oleh: ${event.respondedByUserName ?? "Petugas"} • Durasi: $dur',
-                          style: const TextStyle(fontSize: 11, color: Colors.black87),
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.black87),
                         ),
                       ],
                     ),
@@ -735,10 +818,26 @@ class _WargaDashboardState extends State<WargaDashboard> {
 
   Widget _buildEmergencyContactsCard(BuildContext context) {
     final contacts = [
-      {'name': 'Pos Kamling Utama RT 04', 'phone': '0812-3456-7801', 'role': 'Pos Ronda'},
-      {'name': 'Ketua RT 04 (Nicholas Benaya)', 'phone': '0812-3456-7801', 'role': 'Admin RT'},
-      {'name': 'Polsek Sukolilo Surabaya', 'phone': '031-5947110', 'role': 'Polisi'},
-      {'name': 'Command Center 112 / Damkar', 'phone': '112', 'role': 'Darurat'},
+      {
+        'name': 'Pos Kamling Utama RT 04',
+        'phone': '0812-3456-7801',
+        'role': 'Pos Ronda'
+      },
+      {
+        'name': 'Ketua RT 04 (Nicholas Benaya)',
+        'phone': '0812-3456-7801',
+        'role': 'Admin RT'
+      },
+      {
+        'name': 'Polsek Sukolilo Surabaya',
+        'phone': '031-5947110',
+        'role': 'Polisi'
+      },
+      {
+        'name': 'Command Center 112 / Damkar',
+        'phone': '112',
+        'role': 'Darurat'
+      },
     ];
 
     return Card(
@@ -765,10 +864,14 @@ class _WargaDashboardState extends State<WargaDashboard> {
                 leading: CircleAvatar(
                   backgroundColor: AppColors.secondaryContainer,
                   radius: 16,
-                  child: const Icon(Icons.phone, color: AppColors.secondary, size: 16),
+                  child: const Icon(Icons.phone,
+                      color: AppColors.secondary, size: 16),
                 ),
-                title: Text(c['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                subtitle: Text('${c['phone']} • ${c['role']}', style: const TextStyle(fontSize: 11)),
+                title: Text(c['name']!,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: Text('${c['phone']} • ${c['role']}',
+                    style: const TextStyle(fontSize: 11)),
               );
             }),
           ],

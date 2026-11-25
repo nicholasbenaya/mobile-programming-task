@@ -80,6 +80,14 @@ class SupabaseRondaService {
     }
   }
 
+  Future<void> upsertSchedulesOrThrow(List<PatrolSchedule> schedules) async {
+    final c = client;
+    if (c == null) throw StateError('Supabase belum dikonfigurasi.');
+    if (schedules.isEmpty) return;
+    final payload = schedules.map((s) => s.toJson()).toList();
+    await c.from('patrol_schedules').upsert(payload);
+  }
+
   Stream<List<PatrolSchedule>> streamSchedules(String rtId) {
     final c = client;
     if (c == null) return const Stream.empty();
@@ -124,10 +132,8 @@ class SupabaseRondaService {
   Stream<List<PatrolCheckin>> streamCheckins() {
     final c = client;
     if (c == null) return const Stream.empty();
-    return c
-        .from('patrol_checkins')
-        .stream(primaryKey: ['id'])
-        .map((rows) => rows.map((r) => PatrolCheckin.fromJson(r)).toList());
+    return c.from('patrol_checkins').stream(primaryKey: ['id']).map(
+        (rows) => rows.map((r) => PatrolCheckin.fromJson(r)).toList());
   }
 
   // ==========================================
@@ -187,50 +193,36 @@ class SupabaseRondaService {
   // 5. PERTUKARAN JADWAL (SHIFT SWAP)
   // ==========================================
 
-  Future<List<ShiftSwapRequest>> fetchShiftSwaps() async {
+  Future<List<ShiftSwapRequest>> fetchShiftSwaps(String rtId) async {
     final c = client;
-    if (c == null) return [];
-    try {
-      final res = await c
-          .from('shift_swaps')
-          .select()
-          .order('created_at', ascending: false);
-      return (res as List).map((row) => ShiftSwapRequest.fromJson(row)).toList();
-    } catch (e) {
-      debugPrint('Error fetchShiftSwaps: $e');
-      return [];
-    }
+    if (c == null) throw StateError('Supabase belum dikonfigurasi.');
+    final res = await c
+        .from('shift_swaps')
+        .select()
+        .eq('rt_id', rtId)
+        .order('created_at', ascending: false);
+    return (res as List).map((row) => ShiftSwapRequest.fromJson(row)).toList();
   }
 
   Future<void> insertShiftSwap(ShiftSwapRequest swap) async {
     final c = client;
-    if (c == null) return;
-    try {
-      await c.from('shift_swaps').insert(swap.toJson());
-    } catch (e) {
-      debugPrint('Error insertShiftSwap: $e');
-    }
+    if (c == null) throw StateError('Supabase belum dikonfigurasi.');
+    await c.from('shift_swaps').upsert(swap.toJson());
   }
 
   Future<void> updateShiftSwap(ShiftSwapRequest swap) async {
     final c = client;
-    if (c == null) return;
-    try {
-      await c
-          .from('shift_swaps')
-          .update(swap.toJson())
-          .eq('id', swap.id);
-    } catch (e) {
-      debugPrint('Error updateShiftSwap: $e');
-    }
+    if (c == null) throw StateError('Supabase belum dikonfigurasi.');
+    await c.from('shift_swaps').upsert(swap.toJson());
   }
 
-  Stream<List<ShiftSwapRequest>> streamShiftSwaps() {
+  Stream<List<ShiftSwapRequest>> streamShiftSwaps(String rtId) {
     final c = client;
     if (c == null) return const Stream.empty();
     return c
         .from('shift_swaps')
         .stream(primaryKey: ['id'])
+        .eq('rt_id', rtId)
         .map((rows) => rows.map((r) => ShiftSwapRequest.fromJson(r)).toList());
   }
 
@@ -277,7 +269,9 @@ class SupabaseRondaService {
           .select()
           .eq('rt_id', rtId)
           .order('created_at', ascending: false);
-      return (res as List).map((row) => RondaNotification.fromJson(row)).toList();
+      return (res as List)
+          .map((row) => RondaNotification.fromJson(row))
+          .toList();
     } catch (e) {
       debugPrint('Error fetchNotifications: $e');
       return [];

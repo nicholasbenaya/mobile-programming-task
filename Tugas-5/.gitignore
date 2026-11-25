@@ -4,6 +4,7 @@
 
 # ---- Kunci / konfigurasi lokal (JANGAN di-commit) ----
 lib/core/config/secrets.dart
+lib/core/config/secret.dart
 .env
 .env.*
 *.keystore

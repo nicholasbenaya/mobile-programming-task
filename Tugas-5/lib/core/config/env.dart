@@ -1,4 +1,4 @@
-import 'secrets.dart';
+import 'secret.dart';
 
 /// Akses konfigurasi aplikasi. Nilai sebenarnya ada di secrets.dart.
 class Env {

@@ -1,8 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/services/image_service.dart';
 import '../../../domain/ronda/models/ronda_models.dart';
 import '../../../domain/ronda/services/haversine_calculator.dart';
 import '../../../providers/ronda_provider.dart';
@@ -10,6 +16,7 @@ import 'widgets/dynamic_roster_calendar_dialog.dart';
 import 'widgets/patrol_calendar_widget.dart';
 import 'widgets/patrol_interactive_map.dart';
 import 'widgets/sos_qr_scanner_dialog.dart';
+import 'widgets/checkpoint_qr_scanner_dialog.dart';
 
 /// Dasbor Utama Khusus Petugas Ronda: Fokus pada Tugas Patroli, Scan Pos Fisik & Respons Darurat SOS
 class PetugasRondaDashboard extends StatelessWidget {
@@ -40,14 +47,19 @@ class PetugasRondaDashboard extends StatelessWidget {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: ronda.isOfflineMode ? AppColors.patrolAccent : AppColors.verified,
+                    color: ronda.isOfflineMode
+                        ? AppColors.patrolAccent
+                        : AppColors.verified,
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  ronda.isOfflineMode ? 'Mode Blank Spot (Offline)' : 'Online - RT 04 / RW 02',
-                  style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                  ronda.isOfflineMode
+                      ? 'Mode Blank Spot (Offline)'
+                      : 'Online - RT 04 / RW 02',
+                  style: TextStyle(
+                      fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -57,7 +69,10 @@ class PetugasRondaDashboard extends StatelessWidget {
           IconButton(
             tooltip: 'Perbarui GPS',
             icon: ronda.isLoadingGps
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.my_location),
             onPressed: () => ronda.fetchLiveLocation(),
           ),
@@ -73,11 +88,13 @@ class PetugasRondaDashboard extends StatelessWidget {
         children: [
           // 1. Pesan Sukses / Error Sistem
           if (ronda.lastErrorMessage != null) ...[
-            _buildNotificationBanner(context, ronda.lastErrorMessage!, isError: true),
+            _buildNotificationBanner(context, ronda.lastErrorMessage!,
+                isError: true),
             const SizedBox(height: 12),
           ],
           if (ronda.lastSuccessMessage != null) ...[
-            _buildNotificationBanner(context, ronda.lastSuccessMessage!, isError: false),
+            _buildNotificationBanner(context, ronda.lastSuccessMessage!,
+                isError: false),
             const SizedBox(height: 12),
           ],
 
@@ -135,11 +152,14 @@ class PetugasRondaDashboard extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Konfirmasi Keluar'),
-        content: const Text('Apakah Anda yakin ingin keluar dari sesi Petugas Ronda?'),
+        content: const Text(
+            'Apakah Anda yakin ingin keluar dari sesi Petugas Ronda?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
+            style:
+                FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
             onPressed: () {
               Navigator.pop(ctx);
               ronda.logout();
@@ -151,13 +171,16 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildNotificationBanner(BuildContext context, String text, {required bool isError}) {
+  Widget _buildNotificationBanner(BuildContext context, String text,
+      {required bool isError}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: isError ? AppColors.emergencyLight : AppColors.verifiedLight,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: isError ? AppColors.emergency : AppColors.verified, width: 1),
+        border: Border.all(
+            color: isError ? AppColors.emergency : AppColors.verified,
+            width: 1),
       ),
       child: Row(
         children: [
@@ -182,24 +205,30 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildInternalNotificationsList(BuildContext context, List<RondaNotification> list) {
+  Widget _buildInternalNotificationsList(
+      BuildContext context, List<RondaNotification> list) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.patrolAccentLight.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.patrolAccent.withValues(alpha: 0.5)),
+        border:
+            Border.all(color: AppColors.patrolAccent.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.notifications_active, color: AppColors.patrolAccent, size: 18),
+              const Icon(Icons.notifications_active,
+                  color: AppColors.patrolAccent, size: 18),
               const SizedBox(width: 8),
               const Text(
                 'Pemberitahuan Sistem & Perintah RT',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryLight),
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: AppColors.primaryLight),
               ),
             ],
           ),
@@ -210,11 +239,13 @@ class PetugasRondaDashboard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('• ',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   Expanded(
                     child: Text(
                       '${n.title}: ${n.body}',
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B)),
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF1E293B)),
                     ),
                   ),
                 ],
@@ -226,7 +257,8 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildOverdueWarningBanner(BuildContext context, List<Checkpoint> overdueCps) {
+  Widget _buildOverdueWarningBanner(
+      BuildContext context, List<Checkpoint> overdueCps) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -237,7 +269,8 @@ class PetugasRondaDashboard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.timer_off_outlined, color: AppColors.emergency, size: 22),
+          const Icon(Icons.timer_off_outlined,
+              color: AppColors.emergency, size: 22),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -245,12 +278,16 @@ class PetugasRondaDashboard extends StatelessWidget {
               children: [
                 const Text(
                   'PERINGATAN CHECK-IN POS TERLEWAT',
-                  style: TextStyle(color: AppColors.emergency, fontWeight: FontWeight.bold, fontSize: 12),
+                  style: TextStyle(
+                      color: AppColors.emergency,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Terdapat ${overdueCps.length} pos yang telah melewati jam target patroli belum di-scan: ${overdueCps.map((c) => c.kodeTitik).join(", ")}. Segera menuju lokasi dan lakukan scan.',
-                  style: const TextStyle(color: Color(0xFF7F1D1D), fontSize: 11),
+                  style:
+                      const TextStyle(color: Color(0xFF7F1D1D), fontSize: 11),
                 ),
               ],
             ),
@@ -260,8 +297,10 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildActiveSosAlert(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
-    final isHandling = event.isOnGoing && event.respondedByUserId == ronda.currentUser!.id;
+  Widget _buildActiveSosAlert(
+      BuildContext context, RondaProvider ronda, EmergencyEvent event) {
+    final isHandling =
+        event.isOnGoing && event.respondedByUserId == ronda.currentUser!.id;
     final isAwaitingRt = event.isMenungguVerifikasiRt;
 
     return Container(
@@ -288,18 +327,25 @@ class PetugasRondaDashboard extends StatelessWidget {
                 const Expanded(
                   child: Text(
                     'PANGGILAN DARURAT (SOS) AKTIF!',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.black26,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     event.status.label,
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -307,7 +353,10 @@ class PetugasRondaDashboard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               'Pelapor: ${event.userName}',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16),
             ),
             Text(
               'Lokasi: ${event.userAddress}',
@@ -317,7 +366,10 @@ class PetugasRondaDashboard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'Catatan: "${event.catatan}"',
-                style: const TextStyle(color: Colors.white70, fontSize: 12, fontStyle: FontStyle.italic),
+                style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic),
               ),
             ],
             const SizedBox(height: 14),
@@ -331,9 +383,11 @@ class PetugasRondaDashboard extends StatelessWidget {
                     backgroundColor: Colors.amber.shade400,
                     foregroundColor: Colors.black87,
                   ),
-                  onPressed: () => _handleRespondEmergency(context, ronda, event),
+                  onPressed: () =>
+                      _handleRespondEmergency(context, ronda, event),
                   icon: const Icon(Icons.directions_run),
-                  label: const Text('SAYA MERESPONS (MENUJU LOKASI)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  label: const Text('SAYA MERESPONS (MENUJU LOKASI)',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ] else if (isHandling) ...[
@@ -345,9 +399,11 @@ class PetugasRondaDashboard extends StatelessWidget {
                         backgroundColor: Colors.white,
                         foregroundColor: AppColors.primary,
                       ),
-                      onPressed: () => _openRealQrScanner(context, ronda, event),
+                      onPressed: () =>
+                          _openRealQrScanner(context, ronda, event),
                       icon: const Icon(Icons.qr_code_scanner, size: 18),
-                      label: const Text('Pindai QR Warga', style: TextStyle(fontSize: 12)),
+                      label: const Text('Pindai QR Warga',
+                          style: TextStyle(fontSize: 12)),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -357,9 +413,11 @@ class PetugasRondaDashboard extends StatelessWidget {
                         foregroundColor: Colors.white,
                         side: const BorderSide(color: Colors.white),
                       ),
-                      onPressed: () => _showPhotoResolutionDialog(context, ronda, event),
+                      onPressed: () =>
+                          _showPhotoResolutionDialog(context, ronda, event),
                       icon: const Icon(Icons.camera_alt, size: 18),
-                      label: const Text('Foto Bukti', style: TextStyle(fontSize: 12)),
+                      label: const Text('Foto Bukti',
+                          style: TextStyle(fontSize: 12)),
                     ),
                   ),
                 ],
@@ -392,7 +450,8 @@ class PetugasRondaDashboard extends StatelessWidget {
   }
 
   /// Verifikasi Hak Merespons SOS: Hanya yang sedang bertugas yang boleh merespons
-  void _handleRespondEmergency(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
+  void _handleRespondEmergency(
+      BuildContext context, RondaProvider ronda, EmergencyEvent event) {
     if (ronda.isCurrentPetugasOnDuty) {
       ronda.respondEmergency(event.id);
       return;
@@ -426,7 +485,10 @@ class PetugasRondaDashboard extends StatelessWidget {
               ),
               child: Text(
                 'Jadwal Anda: ${ronda.myTodaySchedule?.shiftName ?? "Tidak ada giliran piket hari ini"}',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.patrolAccent),
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.patrolAccent),
               ),
             ),
             const SizedBox(height: 10),
@@ -437,9 +499,11 @@ class PetugasRondaDashboard extends StatelessWidget {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
+            style:
+                FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
             onPressed: () {
               Navigator.pop(ctx);
               ronda.toggleManualDuty(true);
@@ -452,79 +516,226 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  void _openRealQrScanner(BuildContext context, RondaProvider ronda, EmergencyEvent event) async {
+  void _openRealQrScanner(
+      BuildContext context, RondaProvider ronda, EmergencyEvent event) async {
     final result = await SosQrScannerDialog.show(context, ronda, event);
     if (result == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Insiden Darurat Resmi SELESAI (Validasi QR Warga Berhasil)!')),
+        const SnackBar(
+            content: Text(
+                'Insiden Darurat Resmi SELESAI (Validasi QR Warga Berhasil)!')),
       );
     }
   }
 
-  void _showPhotoResolutionDialog(BuildContext context, RondaProvider ronda, EmergencyEvent event) {
-    final notesController = TextEditingController(text: 'Situasi aman terkendali, warga lansia tidak membawa HP.');
-    showDialog(
+  void _showPhotoResolutionDialog(
+      BuildContext context, RondaProvider ronda, EmergencyEvent event) {
+    final messenger = ScaffoldMessenger.of(context);
+    final notesController = TextEditingController();
+    final imageService = ImageService();
+    File? selectedPhoto;
+    bool isPickingPhoto = false;
+    bool isSavingEvidence = false;
+    String? formError;
+
+    showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Unggah Foto Bukti Lapangan'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Jika warga tidak dapat memindai QR, ambil foto bukti di lokasi. Status akan dikirimkan ke Ketua RT untuk diverifikasi.',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              height: 110,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade300),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> chooseEvidence(ImageSource source) async {
+            setDialogState(() {
+              isPickingPhoto = true;
+              formError = null;
+            });
+            try {
+              final photo = await imageService.pick(source);
+              if (photo != null && ctx.mounted) {
+                setDialogState(() => selectedPhoto = photo);
+              }
+            } on AppException catch (error) {
+              if (ctx.mounted) setDialogState(() => formError = error.message);
+            } finally {
+              if (ctx.mounted) setDialogState(() => isPickingPhoto = false);
+            }
+          }
+
+          return AlertDialog(
+            scrollable: true,
+            title: const Text('Foto Bukti Penanganan'),
+            content: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 420,
+                maxHeight: MediaQuery.sizeOf(context).height * 0.62,
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.camera_alt, size: 32, color: Colors.grey.shade700),
-                  const SizedBox(height: 4),
-                  const Text('Simulasi Kamera Lapangan Siap', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  Text('bukti_penanganan_${event.id}.jpg', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                ],
+              child: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Sertakan foto kondisi setelah ditangani. Bukti akan dikirim ke Ketua RT untuk diverifikasi.',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      const SizedBox(height: 12),
+                      if (selectedPhoto case final photo?)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            photo,
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            cacheWidth: 840,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const SizedBox(
+                              height: 100,
+                              child: Center(
+                                  child:
+                                      Text('Pratinjau foto tidak tersedia.')),
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          height: 112,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant,
+                            ),
+                          ),
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_a_photo_outlined, size: 28),
+                              SizedBox(height: 4),
+                              Text('Foto bukti wajib disertakan'),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: isPickingPhoto
+                                  ? null
+                                  : () => chooseEvidence(ImageSource.camera),
+                              icon: isPickingPhoto
+                                  ? const SizedBox.square(
+                                      dimension: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.camera_alt_outlined),
+                              label: const Text('Kamera'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: isPickingPhoto
+                                  ? null
+                                  : () => chooseEvidence(ImageSource.gallery),
+                              icon: const Icon(Icons.photo_library_outlined),
+                              label: const Text('Galeri'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: notesController,
+                        maxLines: 3,
+                        maxLength: 500,
+                        decoration: const InputDecoration(
+                          labelText: 'Keterangan Penanganan',
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                      if (formError != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          formError!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: notesController,
-              decoration: const InputDecoration(
-                labelText: 'Keterangan Penanganan',
-                isDense: true,
+            actions: [
+              TextButton(
+                onPressed: isPickingPhoto || isSavingEvidence
+                    ? null
+                    : () => Navigator.pop(ctx),
+                child: const Text('Batal'),
               ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
-            onPressed: () {
-              Navigator.pop(ctx);
-              ronda.resolveEmergencyWithPhoto(
-                eventId: event.id,
-                photoPath: '/storage/emulated/0/DCIM/bukti_penanganan_${event.id}.jpg',
-                notes: notesController.text.trim(),
-              );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Foto bukti dikirim. Status menunggu verifikasi RT.')),
-              );
-            },
-            child: const Text('Kirim ke Ketua RT'),
-          ),
-        ],
+              FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryLight),
+                onPressed: isPickingPhoto || isSavingEvidence
+                    ? null
+                    : () async {
+                        if (selectedPhoto == null) {
+                          setDialogState(() => formError =
+                              'Pilih foto bukti sebelum mengirim ke Ketua RT.');
+                          return;
+                        }
+                        setDialogState(() {
+                          isSavingEvidence = true;
+                          formError = null;
+                        });
+                        try {
+                          final savedPhoto = await _persistEvidencePhoto(
+                            selectedPhoto!,
+                            prefix: 'bukti_sos_${event.id}',
+                          );
+                          if (!ctx.mounted) return;
+                          ronda.resolveEmergencyWithPhoto(
+                            eventId: event.id,
+                            photoPath: savedPhoto.path,
+                            notes: notesController.text.trim(),
+                          );
+                          Navigator.pop(ctx);
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Foto bukti dikirim. Menunggu verifikasi Ketua RT.'),
+                            ),
+                          );
+                        } catch (_) {
+                          if (ctx.mounted) {
+                            setDialogState(() {
+                              isSavingEvidence = false;
+                              formError =
+                                  'Foto bukti gagal disimpan. Coba lagi.';
+                            });
+                          }
+                        }
+                      },
+                child: isSavingEvidence
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Kirim ke Ketua RT'),
+              ),
+            ],
+          );
+        },
       ),
-    );
+    ).whenComplete(notesController.dispose);
   }
 
   Widget _buildDutyStatusCard(BuildContext context, RondaProvider ronda) {
@@ -539,7 +750,8 @@ class PetugasRondaDashboard extends StatelessWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: isOnDuty ? AppColors.verifiedLight : Colors.grey.shade200,
+                  backgroundColor:
+                      isOnDuty ? AppColors.verifiedLight : Colors.grey.shade200,
                   radius: 20,
                   child: Icon(
                     isOnDuty ? Icons.shield : Icons.nightlight_outlined,
@@ -559,14 +771,19 @@ class PetugasRondaDashboard extends StatelessWidget {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
-                              color: isOnDuty ? AppColors.verified : Colors.grey.shade800,
+                              color: isOnDuty
+                                  ? AppColors.verified
+                                  : Colors.grey.shade800,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: isOnDuty ? AppColors.verifiedLight : Colors.grey.shade200,
+                              color: isOnDuty
+                                  ? AppColors.verifiedLight
+                                  : Colors.grey.shade200,
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -574,7 +791,9 @@ class PetugasRondaDashboard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
-                                color: isOnDuty ? AppColors.verified : Colors.grey.shade700,
+                                color: isOnDuty
+                                    ? AppColors.verified
+                                    : Colors.grey.shade700,
                               ),
                             ),
                           ),
@@ -584,7 +803,8 @@ class PetugasRondaDashboard extends StatelessWidget {
                         mySched != null
                             ? '${mySched.shiftName} (${mySched.jamMulai} - ${mySched.jamSelesai} WIB)'
                             : 'Tidak ada shift dinas otomatis malam ini',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondaryLight),
                       ),
                     ],
                   ),
@@ -596,7 +816,9 @@ class PetugasRondaDashboard extends StatelessWidget {
                       value: ronda.isManualDutyActive,
                       onChanged: (val) => ronda.toggleManualDuty(val),
                     ),
-                    const Text('Siaga', style: TextStyle(fontSize: 10, color: AppColors.textSecondaryLight)),
+                    const Text('Siaga',
+                        style: TextStyle(
+                            fontSize: 10, color: AppColors.textSecondaryLight)),
                   ],
                 ),
               ],
@@ -604,14 +826,18 @@ class PetugasRondaDashboard extends StatelessWidget {
             const Divider(height: 20),
             Row(
               children: [
-                const Icon(Icons.wifi_tethering_off, size: 18, color: AppColors.patrolAccent),
+                const Icon(Icons.wifi_tethering_off,
+                    size: 18, color: AppColors.patrolAccent),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Mode Blank Spot (Offline)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                      Text('Simulasi area tanpa internet (antrean lokal)', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                      Text('Mode Blank Spot (Offline)',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text('Simulasi area tanpa internet (antrean lokal)',
+                          style: TextStyle(fontSize: 10, color: Colors.grey)),
                     ],
                   ),
                 ),
@@ -631,11 +857,15 @@ class PetugasRondaDashboard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.cloud_off, size: 14, color: AppColors.patrolAccent),
+                    const Icon(Icons.cloud_off,
+                        size: 14, color: AppColors.patrolAccent),
                     const SizedBox(width: 6),
                     Text(
                       'Antrean scan offline: ${ronda.offlineQueue.pendingCount} rekaman',
-                      style: const TextStyle(fontSize: 11, color: AppColors.patrolAccent, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.patrolAccent,
+                          fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -663,7 +893,8 @@ class PetugasRondaDashboard extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
             ),
             const Spacer(),
-            Text('${checkpoints.length} Pos', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text('${checkpoints.length} Pos',
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
         const SizedBox(height: 10),
@@ -716,10 +947,16 @@ class PetugasRondaDashboard extends StatelessWidget {
               child: Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: status == CheckpointScheduleStatus.selesai ? AppColors.verified : Colors.grey.shade200,
+                    backgroundColor: status == CheckpointScheduleStatus.selesai
+                        ? AppColors.verified
+                        : Colors.grey.shade200,
                     child: Icon(
-                      status == CheckpointScheduleStatus.selesai ? Icons.check : Icons.pin_drop,
-                      color: status == CheckpointScheduleStatus.selesai ? Colors.white : Colors.grey.shade700,
+                      status == CheckpointScheduleStatus.selesai
+                          ? Icons.check
+                          : Icons.pin_drop,
+                      color: status == CheckpointScheduleStatus.selesai
+                          ? Colors.white
+                          : Colors.grey.shade700,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -729,13 +966,15 @@ class PetugasRondaDashboard extends StatelessWidget {
                       children: [
                         Text(
                           '${cp.kodeTitik} - ${cp.namaLokasi}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         const SizedBox(height: 2),
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: statusBg,
                                 borderRadius: BorderRadius.circular(4),
@@ -752,7 +991,8 @@ class PetugasRondaDashboard extends StatelessWidget {
                             const SizedBox(width: 6),
                             Text(
                               'Target: ${cp.targetWaktuCheckin}',
-                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -763,8 +1003,11 @@ class PetugasRondaDashboard extends StatelessWidget {
                               : 'Menunggu sinyal GPS...',
                           style: TextStyle(
                             fontSize: 11,
-                            color: isNear ? AppColors.verified : Colors.grey.shade700,
-                            fontWeight: isNear ? FontWeight.bold : FontWeight.normal,
+                            color: isNear
+                                ? AppColors.verified
+                                : Colors.grey.shade700,
+                            fontWeight:
+                                isNear ? FontWeight.bold : FontWeight.normal,
                           ),
                         ),
                       ],
@@ -774,11 +1017,13 @@ class PetugasRondaDashboard extends StatelessWidget {
                   FilledButton.tonal(
                     style: FilledButton.styleFrom(
                       minimumSize: Size.zero,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                     onPressed: () => _handleCheckpointScan(context, ronda, cp),
-                    child: const Text('Scan QR', style: TextStyle(fontSize: 12)),
+                    child:
+                        const Text('Scan QR', style: TextStyle(fontSize: 12)),
                   ),
                 ],
               ),
@@ -789,57 +1034,20 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  void _handleCheckpointScan(BuildContext context, RondaProvider ronda, Checkpoint cp) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.qr_code_scanner, color: AppColors.secondary),
-                const SizedBox(width: 8),
-                Text('Pindai QR: ${cp.kodeTitik}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(cp.namaLokasi, style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 14),
-            const Text(
-              'Pilih mode verifikasi check-in:',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  await ronda.checkinCheckpoint(checkpoint: cp, simulateProximity: false);
-                },
-                icon: const Icon(Icons.gps_fixed),
-                label: const Text('Gunakan GPS Asli Perangkat'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  await ronda.checkinCheckpoint(checkpoint: cp, simulateProximity: true);
-                },
-                icon: const Icon(Icons.vibration),
-                label: const Text('Simulasi Berada di Pos (Jarak 5m - Untuk Uji Coba)'),
-              ),
-            ),
-          ],
-        ),
+  Future<void> _handleCheckpointScan(
+      BuildContext context, RondaProvider ronda, Checkpoint cp) async {
+    final payload = await CheckpointQrScannerDialog.scan(context, cp);
+    if (payload == null || !context.mounted) return;
+
+    final success = await ronda.checkinCheckpoint(
+        checkpoint: cp, scannedQrPayload: payload);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success
+            ? 'Check-in ${cp.kodeTitik} berhasil.'
+            : (ronda.lastErrorMessage ?? 'Check-in gagal.')),
+        backgroundColor: success ? AppColors.verified : AppColors.emergency,
       ),
     );
   }
@@ -849,7 +1057,8 @@ class PetugasRondaDashboard extends StatelessWidget {
       children: [
         Expanded(
           child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+            style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14)),
             onPressed: () => _showReportIncidentDialog(context, ronda),
             icon: const Icon(Icons.camera_alt, color: Colors.deepOrange),
             label: const Text('Lapor Insiden', style: TextStyle(fontSize: 13)),
@@ -858,7 +1067,8 @@ class PetugasRondaDashboard extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+            style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14)),
             onPressed: () => _showRichShiftSwapDialog(context, ronda),
             icon: const Icon(Icons.swap_horiz, color: AppColors.secondary),
             label: const Text('Tukar Jadwal', style: TextStyle(fontSize: 13)),
@@ -870,50 +1080,272 @@ class PetugasRondaDashboard extends StatelessWidget {
 
   void _showReportIncidentDialog(BuildContext context, RondaProvider ronda) {
     final noteController = TextEditingController();
+    final imageService = ImageService();
     IncidentCategory selectedCat = IncidentCategory.orangMencurigakan;
+    File? selectedPhoto;
+    bool isPickingPhoto = false;
+    bool isSubmitting = false;
+    String? formError;
 
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Lapor Temuan Insiden Patroli'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              DropdownButtonFormField<IncidentCategory>(
-                initialValue: selectedCat,
-                items: IncidentCategory.values.map((c) => DropdownMenuItem(value: c, child: Text(c.label, style: const TextStyle(fontSize: 13)))).toList(),
-                onChanged: (val) {
-                  if (val != null) setDialogState(() => selectedCat = val);
-                },
-                decoration: const InputDecoration(labelText: 'Kategori Insiden'),
+        builder: (context, setDialogState) {
+          Future<void> choosePhoto(ImageSource source) async {
+            setDialogState(() {
+              isPickingPhoto = true;
+              formError = null;
+            });
+            try {
+              final photo = await imageService.pick(source);
+              if (photo != null && ctx.mounted) {
+                setDialogState(() => selectedPhoto = photo);
+              }
+            } on AppException catch (error) {
+              if (ctx.mounted) setDialogState(() => formError = error.message);
+            } finally {
+              if (ctx.mounted) setDialogState(() => isPickingPhoto = false);
+            }
+          }
+
+          return AlertDialog(
+            scrollable: true,
+            title: const Text('Lapor Temuan Insiden Patroli'),
+            content: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 420,
+                maxHeight: MediaQuery.sizeOf(context).height * 0.62,
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: noteController,
-                decoration: const InputDecoration(labelText: 'Keterangan Temuan'),
-                maxLines: 2,
+              child: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DropdownButtonFormField<IncidentCategory>(
+                        initialValue: selectedCat,
+                        isExpanded: true,
+                        menuMaxHeight: 320,
+                        items: IncidentCategory.values
+                            .map((category) => DropdownMenuItem(
+                                  value: category,
+                                  child: Text(
+                                    category.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: isSubmitting
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  setDialogState(() => selectedCat = value);
+                                }
+                              },
+                        decoration: const InputDecoration(
+                          labelText: 'Kategori Insiden',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: noteController,
+                        enabled: !isSubmitting,
+                        maxLines: 3,
+                        maxLength: 500,
+                        decoration: const InputDecoration(
+                          labelText: 'Keterangan Temuan',
+                          hintText:
+                              'Jelaskan lokasi dan kondisi yang ditemukan',
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Foto Bukti *',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      if (selectedPhoto case final photo?) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            photo,
+                            width: double.infinity,
+                            height: 170,
+                            fit: BoxFit.cover,
+                            cacheWidth: 840,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                              height: 100,
+                              alignment: Alignment.center,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerLow,
+                              child:
+                                  const Text('Pratinjau foto tidak tersedia.'),
+                            ),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: isSubmitting
+                                ? null
+                                : () =>
+                                    setDialogState(() => selectedPhoto = null),
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            label: const Text('Hapus foto'),
+                          ),
+                        ),
+                      ] else
+                        Container(
+                          height: 112,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant,
+                            ),
+                          ),
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add_a_photo_outlined, size: 28),
+                              SizedBox(height: 4),
+                              Text('Foto bukti wajib disertakan'),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: isPickingPhoto || isSubmitting
+                                  ? null
+                                  : () => choosePhoto(ImageSource.camera),
+                              icon: isPickingPhoto
+                                  ? const SizedBox.square(
+                                      dimension: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.camera_alt_outlined),
+                              label: const Text('Kamera'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: isPickingPhoto || isSubmitting
+                                  ? null
+                                  : () => choosePhoto(ImageSource.gallery),
+                              icon: const Icon(Icons.photo_library_outlined),
+                              label: const Text('Galeri'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (formError != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          formError!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+                child: const Text('Batal'),
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primaryLight,
+                ),
+                onPressed: isSubmitting || isPickingPhoto
+                    ? null
+                    : () async {
+                        final note = noteController.text.trim();
+                        if (note.isEmpty || selectedPhoto == null) {
+                          setDialogState(() {
+                            formError = note.isEmpty
+                                ? 'Keterangan temuan wajib diisi.'
+                                : 'Pilih foto bukti sebelum mengirim laporan.';
+                          });
+                          return;
+                        }
+
+                        setDialogState(() {
+                          isSubmitting = true;
+                          formError = null;
+                        });
+                        try {
+                          final savedPhoto = await _persistEvidencePhoto(
+                            selectedPhoto!,
+                            prefix: 'insiden',
+                          );
+                          if (!ctx.mounted) return;
+                          ronda.reportIncident(
+                            category: selectedCat,
+                            keterangan: note,
+                            photoPath: savedPhoto.path,
+                          );
+                          Navigator.pop(ctx);
+                        } catch (_) {
+                          if (ctx.mounted) {
+                            setDialogState(() {
+                              isSubmitting = false;
+                              formError =
+                                  'Foto bukti gagal disimpan. Coba lagi.';
+                            });
+                          }
+                        }
+                      },
+                icon: isSubmitting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_outlined),
+                label: const Text('Kirim Laporan'),
               ),
             ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
-              onPressed: () {
-                Navigator.pop(ctx);
-                ronda.reportIncident(
-                  category: selectedCat,
-                  keterangan: noteController.text.trim().isEmpty ? 'Pengecekan rutin di gang buntu' : noteController.text.trim(),
-                  photoPath: '/storage/emulated/0/DCIM/insiden_${DateTime.now().millisecondsSinceEpoch}.jpg',
-                );
-              },
-              child: const Text('Kirim Laporan'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
+    ).whenComplete(noteController.dispose);
+  }
+
+  Future<File> _persistEvidencePhoto(File source,
+      {required String prefix}) async {
+    final appDirectory = await getApplicationDocumentsDirectory();
+    final evidenceDirectory = Directory(
+      '${appDirectory.path}${Platform.pathSeparator}ronda_reports',
+    );
+    await evidenceDirectory.create(recursive: true);
+
+    final extension = source.path.contains('.')
+        ? source.path.split('.').last.toLowerCase()
+        : 'jpg';
+    final fileName =
+        '${prefix}_${DateTime.now().microsecondsSinceEpoch}.$extension';
+    return source.copy(
+      '${evidenceDirectory.path}${Platform.pathSeparator}$fileName',
     );
   }
 
@@ -951,7 +1383,8 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildOngoingSwapRequestsSection(BuildContext context, RondaProvider ronda) {
+  Widget _buildOngoingSwapRequestsSection(
+      BuildContext context, RondaProvider ronda) {
     final incoming = ronda.myIncomingSwapRequests;
     final outgoing = ronda.myOutgoingSwapRequests;
 
@@ -980,7 +1413,10 @@ class PetugasRondaDashboard extends StatelessWidget {
                 ),
                 child: Text(
                   '${incoming.length} Baru',
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold),
                 ),
               ),
           ],
@@ -991,7 +1427,10 @@ class PetugasRondaDashboard extends StatelessWidget {
         if (incoming.isNotEmpty) ...[
           const Text(
             'Permintaan Masuk dari Rekan (Perlu Persetujuan Anda):',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.patrolAccent),
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.patrolAccent),
           ),
           const SizedBox(height: 6),
           ...incoming.map((req) {
@@ -999,7 +1438,8 @@ class PetugasRondaDashboard extends StatelessWidget {
               color: AppColors.patrolAccentLight.withValues(alpha: 0.3),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: AppColors.patrolAccent.withValues(alpha: 0.6)),
+                side: BorderSide(
+                    color: AppColors.patrolAccent.withValues(alpha: 0.6)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -1008,17 +1448,20 @@ class PetugasRondaDashboard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.person, size: 16, color: AppColors.primaryLight),
+                        const Icon(Icons.person,
+                            size: 16, color: AppColors.primaryLight),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             'Dari: ${req.requesterName}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ),
                         Text(
                           DateFormat('dd/MM HH:mm').format(req.createdAt),
-                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                          style:
+                              const TextStyle(fontSize: 10, color: Colors.grey),
                         ),
                       ],
                     ),
@@ -1029,13 +1472,17 @@ class PetugasRondaDashboard extends StatelessWidget {
                     ),
                     Text(
                       'Menggantikan jadwal Anda: ${req.targetShift} (${req.targetDate != null ? DateFormat("dd MMMM yyyy", "id_ID").format(req.targetDate!) : "Jadwal Terjadwal"})',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600),
                     ),
                     if (req.alasan.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
                         'Alasan: "${req.alasan}"',
-                        style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.black87),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.black87),
                       ),
                     ],
                     const SizedBox(height: 10),
@@ -1049,9 +1496,11 @@ class PetugasRondaDashboard extends StatelessWidget {
                             side: const BorderSide(color: AppColors.emergency),
                           ),
                           onPressed: () {
-                            ronda.respondShiftSwap(requestId: req.id, isAccepted: false);
+                            ronda.respondShiftSwap(
+                                requestId: req.id, isAccepted: false);
                           },
-                          child: const Text('Tolak', style: TextStyle(fontSize: 12)),
+                          child: const Text('Tolak',
+                              style: TextStyle(fontSize: 12)),
                         ),
                         const SizedBox(width: 8),
                         FilledButton(
@@ -1060,9 +1509,11 @@ class PetugasRondaDashboard extends StatelessWidget {
                             backgroundColor: AppColors.verified,
                           ),
                           onPressed: () {
-                            ronda.respondShiftSwap(requestId: req.id, isAccepted: true);
+                            ronda.respondShiftSwap(
+                                requestId: req.id, isAccepted: true);
                           },
-                          child: const Text('Terima & Tukar', style: TextStyle(fontSize: 12)),
+                          child: const Text('Terima & Tukar',
+                              style: TextStyle(fontSize: 12)),
                         ),
                       ],
                     ),
@@ -1078,7 +1529,8 @@ class PetugasRondaDashboard extends StatelessWidget {
         if (outgoing.isNotEmpty) ...[
           const Text(
             'Pengajuan Saya ke Rekan Lain:',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey),
+            style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey),
           ),
           const SizedBox(height: 6),
           ...outgoing.take(3).map((req) {
@@ -1113,7 +1565,8 @@ class PetugasRondaDashboard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant),
               ),
               child: Row(
                 children: [
@@ -1123,25 +1576,32 @@ class PetugasRondaDashboard extends StatelessWidget {
                       children: [
                         Text(
                           'Kepada: ${req.targetUserName}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                         Text(
                           '${req.requesterShift} ➔ ${req.targetShift}',
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          style:
+                              const TextStyle(fontSize: 11, color: Colors.grey),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+                      border:
+                          Border.all(color: statusColor.withValues(alpha: 0.5)),
                     ),
                     child: Text(
                       statusLabel,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: statusColor),
                     ),
                   ),
                 ],
@@ -1153,7 +1613,8 @@ class PetugasRondaDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildResolvedSosAuditSection(BuildContext context, RondaProvider ronda) {
+  Widget _buildResolvedSosAuditSection(
+      BuildContext context, RondaProvider ronda) {
     final myResolved = ronda.resolvedEmergencies
         .where((e) => e.respondedByUserId == ronda.currentUser?.id)
         .toList();
@@ -1188,39 +1649,52 @@ class PetugasRondaDashboard extends StatelessWidget {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppColors.verifiedLight,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Text(
                           'SELESAI TERTANGANI',
-                          style: TextStyle(color: AppColors.verified, fontWeight: FontWeight.bold, fontSize: 10),
+                          style: TextStyle(
+                              color: AppColors.verified,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10),
                         ),
                       ),
                       const Spacer(),
                       Text(
-                        event.resolvedAt != null ? DateFormat('dd/MM HH:mm').format(event.resolvedAt!) : '',
-                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        event.resolvedAt != null
+                            ? DateFormat('dd/MM HH:mm')
+                                .format(event.resolvedAt!)
+                            : '',
+                        style:
+                            const TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'Warga Pelapor: ${event.userName} (${event.userAddress})',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     'Metode Selesai: ${event.resolvedVia?.label ?? "Verifikasi Fisik"} • Durasi Tanggap: $durResolve',
                     style: const TextStyle(fontSize: 11, color: Colors.black87),
                   ),
-                  if (event.resolutionNotes != null && event.resolutionNotes!.isNotEmpty)
+                  if (event.resolutionNotes != null &&
+                      event.resolutionNotes!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         'Catatan: "${event.resolutionNotes}"',
-                        style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.grey),
                       ),
                     ),
                 ],

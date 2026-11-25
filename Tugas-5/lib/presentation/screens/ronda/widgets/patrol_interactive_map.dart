@@ -8,6 +8,7 @@ import '../../../../domain/ronda/models/ronda_models.dart';
 import '../../../../domain/ronda/services/haversine_calculator.dart';
 import '../../../../providers/ronda_provider.dart';
 import '../../../widgets/map_tile_layer.dart';
+import 'checkpoint_qr_scanner_dialog.dart';
 
 /// Peta Interaktif Patroli Wilayah Siskamling RT (OpenStreetMap + FlutterMap)
 /// Menampilkan titik-titik pos ronda, geofence radius, lokasi GPS pengguna,
@@ -39,7 +40,8 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
     _mapController.move(point, zoom);
   }
 
-  void _showCheckpointSheet(BuildContext context, Checkpoint cp, RondaProvider ronda) {
+  void _showCheckpointSheet(
+      BuildContext context, Checkpoint cp, RondaProvider ronda) {
     setState(() => _selectedCheckpoint = cp);
 
     final userLat = ronda.currentGpsPosition?.latitude ?? cp.latitude;
@@ -88,7 +90,8 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: _getStatusBgColor(status),
                       borderRadius: BorderRadius.circular(8),
@@ -106,7 +109,8 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
                   Expanded(
                     child: Text(
                       cp.namaLokasi,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ),
                   IconButton(
@@ -126,11 +130,13 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.access_time, size: 16, color: AppColors.patrolAccent),
+                        const Icon(Icons.access_time,
+                            size: 16, color: AppColors.patrolAccent),
                         const SizedBox(width: 8),
                         Text(
                           'Jadwal Check-in: ${cp.targetWaktuCheckin} WIB',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600),
                         ),
                         const Spacer(),
                         _buildStatusBadge(status),
@@ -139,20 +145,24 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
                     const Divider(height: 16),
                     Row(
                       children: [
-                        const Icon(Icons.radar, size: 16, color: AppColors.secondary),
+                        const Icon(Icons.radar,
+                            size: 16, color: AppColors.secondary),
                         const SizedBox(width: 8),
                         Text(
                           'Jarak GPS Anda: ${dist.toStringAsFixed(1)} meter',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: dist <= cp.radiusMeter ? AppColors.verified : Colors.grey.shade700,
+                            color: dist <= cp.radiusMeter
+                                ? AppColors.verified
+                                : Colors.grey.shade700,
                           ),
                         ),
                         const Spacer(),
                         Text(
                           'Radius aman: ${cp.radiusMeter.toInt()}m',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey.shade600),
                         ),
                       ],
                     ),
@@ -172,7 +182,8 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.check_circle, color: AppColors.verified, size: 18),
+                        Icon(Icons.check_circle,
+                            color: AppColors.verified, size: 18),
                         SizedBox(width: 8),
                         Text(
                           'Pos ini sudah Anda check-in dan terverifikasi hari ini.',
@@ -186,46 +197,19 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
                     ),
                   )
                 else ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            Navigator.pop(ctx);
-                            final success = await ronda.checkinCheckpoint(
-                              checkpoint: cp,
-                              simulateProximity: true,
-                            );
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    success
-                                        ? 'Check-in pos ${cp.kodeTitik} berhasil diverifikasi!'
-                                        : (ronda.lastErrorMessage ?? 'Gagal check-in'),
-                                  ),
-                                  backgroundColor: success ? AppColors.verified : AppColors.emergency,
-                                ),
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.near_me, size: 16),
-                          label: const Text('Simulasi Dekat Pos (5m)', style: TextStyle(fontSize: 12)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            _openQrCheckinDialog(context, cp, ronda);
-                          },
-                          icon: const Icon(Icons.qr_code_scanner, size: 16),
-                          label: const Text('Scan QR Pos', style: TextStyle(fontSize: 12)),
-                        ),
-                      ),
-                    ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primaryLight),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _scanAndCheckIn(context, cp, ronda);
+                      },
+                      icon: const Icon(Icons.qr_code_scanner, size: 16),
+                      label: const Text('Pindai QR dan Check-in',
+                          style: TextStyle(fontSize: 12)),
+                    ),
                   ),
                 ],
               ] else if (isAdmin) ...[
@@ -237,12 +221,15 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
                       ronda.notifyCheckpointReminder(checkpointId: cp.id);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Peringatan check-in pos ${cp.kodeTitik} dikirimkan ke petugas.'),
+                          content: Text(
+                              'Peringatan check-in pos ${cp.kodeTitik} dikirimkan ke petugas.'),
                         ),
                       );
                     },
-                    icon: const Icon(Icons.notifications_active, size: 16, color: AppColors.patrolAccent),
-                    label: const Text('Ingatkan Petugas Check-in Pos Ini', style: TextStyle(fontSize: 12)),
+                    icon: const Icon(Icons.notifications_active,
+                        size: 16, color: AppColors.patrolAccent),
+                    label: const Text('Ingatkan Petugas Check-in Pos Ini',
+                        style: TextStyle(fontSize: 12)),
                   ),
                 ),
               ],
@@ -253,68 +240,20 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
     );
   }
 
-  void _openQrCheckinDialog(BuildContext context, Checkpoint cp, RondaProvider ronda) {
-    showModalBottomSheet<void>(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.qr_code_scanner, color: AppColors.secondary),
-                const SizedBox(width: 8),
-                Text('Pindai QR: ${cp.kodeTitik}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(cp.namaLokasi, style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final success = await ronda.checkinCheckpoint(checkpoint: cp, simulateProximity: false);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(success ? 'Check-in ${cp.kodeTitik} berhasil!' : (ronda.lastErrorMessage ?? 'Gagal')),
-                        backgroundColor: success ? AppColors.verified : AppColors.emergency,
-                      ),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.gps_fixed),
-                label: const Text('Check-in dengan GPS Asli'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final success = await ronda.checkinCheckpoint(checkpoint: cp, simulateProximity: true);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(success ? 'Simulasi Check-in ${cp.kodeTitik} berhasil!' : (ronda.lastErrorMessage ?? 'Gagal')),
-                        backgroundColor: success ? AppColors.verified : AppColors.emergency,
-                      ),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.near_me),
-                label: const Text('Simulasi Berada di Pos (Jarak 5m)'),
-              ),
-            ),
-          ],
-        ),
+  Future<void> _scanAndCheckIn(
+      BuildContext context, Checkpoint cp, RondaProvider ronda) async {
+    final payload = await CheckpointQrScannerDialog.scan(context, cp);
+    if (payload == null || !context.mounted) return;
+
+    final success = await ronda.checkinCheckpoint(
+        checkpoint: cp, scannedQrPayload: payload);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success
+            ? 'Check-in pos ${cp.kodeTitik} berhasil.'
+            : (ronda.lastErrorMessage ?? 'Check-in gagal.')),
+        backgroundColor: success ? AppColors.verified : AppColors.emergency,
       ),
     );
   }
@@ -350,10 +289,12 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
     final textCol = _getStatusTextColor(status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
       child: Text(
         status.label,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textCol),
+        style: TextStyle(
+            fontSize: 10, fontWeight: FontWeight.bold, color: textCol),
       ),
     );
   }
@@ -408,12 +349,16 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
                     color: _getStatusTextColor(status),
                     borderRadius: BorderRadius.circular(4),
                     boxShadow: const [
-                      BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
+                      BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 4,
+                          offset: Offset(0, 2)),
                     ],
                   ),
                   child: Text(
@@ -473,7 +418,10 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
                   color: AppColors.emergency,
                   borderRadius: BorderRadius.circular(4),
                   boxShadow: const [
-                    BoxShadow(color: Colors.black38, blurRadius: 4, offset: Offset(0, 2)),
+                    BoxShadow(
+                        color: Colors.black38,
+                        blurRadius: 4,
+                        offset: Offset(0, 2)),
                   ],
                 ),
                 child: Text(
@@ -497,7 +445,9 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
         FlutterMap(
           mapController: _mapController,
           options: MapOptions(
-            initialCenter: myPos != null ? LatLng(myPos.latitude, myPos.longitude) : _centerRt,
+            initialCenter: myPos != null
+                ? LatLng(myPos.latitude, myPos.longitude)
+                : _centerRt,
             initialZoom: 16.8,
             minZoom: 14.0,
             maxZoom: 19.0,
@@ -530,7 +480,8 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
                   backgroundColor: Theme.of(context).colorScheme.surface,
                   foregroundColor: Colors.blue,
                   tooltip: 'Lokasi Saya',
-                  onPressed: () => _centerOn(LatLng(myPos.latitude, myPos.longitude), 18.0),
+                  onPressed: () =>
+                      _centerOn(LatLng(myPos.latitude, myPos.longitude), 18.0),
                   child: const Icon(Icons.gps_fixed, size: 18),
                 ),
               ],
@@ -546,15 +497,20 @@ class _PatrolInteractiveMapState extends State<PatrolInteractiveMap> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
+              color:
+                  Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+              border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant),
             ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            child: const Wrap(
+              alignment: WrapAlignment.spaceAround,
+              spacing: 12,
+              runSpacing: 6,
               children: [
                 _LegendItem(color: AppColors.verified, label: 'Selesai'),
-                _LegendItem(color: AppColors.patrolAccent, label: 'Waktunya Scan'),
+                _LegendItem(
+                    color: AppColors.patrolAccent, label: 'Waktunya Scan'),
                 _LegendItem(color: AppColors.emergency, label: 'Terlewat/SOS'),
                 _LegendItem(color: AppColors.secondary, label: 'Mendatang'),
               ],

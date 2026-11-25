@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/ronda/models/ronda_models.dart';
+import '../repositories/ronda_photo_repository.dart';
 import 'supabase_service.dart';
 
 /// Layanan Komunikasi Data Cloud Supabase untuk Ekosistem Ronda Digital
@@ -14,6 +16,45 @@ class SupabaseRondaService {
 
   SupabaseClient? get client => _client ?? SupabaseService.clientOrNull;
   bool get isAvailable => client != null;
+
+  static const rondaRtId = 'RT-04-RW-02-SUKOLILO';
+
+  Future<RondaUser> signInRondaUser({
+    required String whatsapp,
+    required String password,
+  }) async {
+    final c = client;
+    if (c == null) throw StateError('Supabase belum dikonfigurasi.');
+    final response = await c.rpc('ronda_demo_login', params: {
+      'p_whatsapp': whatsapp.replaceAll(RegExp(r'\D'), ''),
+      'p_password': password,
+    });
+    if (response is! List || response.isEmpty) {
+      throw StateError('Nomor WhatsApp atau kata sandi salah.');
+    }
+    return RondaUser.fromJson(Map<String, dynamic>.from(response.first));
+  }
+
+  RondaUser? get currentRondaUser => null;
+
+  Future<void> signOutRondaUser() async {
+    final c = client;
+    if (c != null && c.auth.currentSession != null) await c.auth.signOut();
+  }
+
+  RondaPhotoRepository get _rondaPhotos {
+    final c = client;
+    if (c == null) throw StateError('Supabase belum dikonfigurasi.');
+    return RondaPhotoRepository(c);
+  }
+
+  Future<String> uploadRondaPhoto(File photo, {required String rtId}) =>
+      _rondaPhotos.upload(photo: photo, rtId: rtId);
+
+  Future<String> createRondaPhotoUrl(String path) =>
+      _rondaPhotos.signedUrl(path);
+
+  Future<void> deleteRondaPhoto(String path) => _rondaPhotos.delete(path);
 
   // ==========================================
   // 1. DATA PENGGUNA & POS CHECKPOINT
@@ -207,13 +248,17 @@ class SupabaseRondaService {
   Future<void> insertShiftSwap(ShiftSwapRequest swap) async {
     final c = client;
     if (c == null) throw StateError('Supabase belum dikonfigurasi.');
-    await c.from('shift_swaps').upsert(swap.toJson());
+    await c.from('shift_swaps').insert(swap.toJson());
   }
 
   Future<void> updateShiftSwap(ShiftSwapRequest swap) async {
     final c = client;
     if (c == null) throw StateError('Supabase belum dikonfigurasi.');
-    await c.from('shift_swaps').upsert(swap.toJson());
+    await c
+        .from('shift_swaps')
+        .update(swap.toJson())
+        .eq('id', swap.id)
+        .eq('rt_id', swap.rtId);
   }
 
   Stream<List<ShiftSwapRequest>> streamShiftSwaps(String rtId) {

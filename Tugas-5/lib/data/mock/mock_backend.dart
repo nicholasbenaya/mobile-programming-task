@@ -26,10 +26,12 @@ class MockBackend {
   final Map<String, int> _failedLoginAttempts = {};
   final Map<String, DateTime> _lockoutUntil = {};
 
-  final SosEventDispatcher _sosDispatcher = SosEventDispatcher(debounceWindowSeconds: 15);
+  final SosEventDispatcher _sosDispatcher =
+      SosEventDispatcher(debounceWindowSeconds: 15);
   final List<FcmEmergencyPayload> fcmBroadcastHistory = [];
 
-  List<RondaNotification> get notifications => List.unmodifiable(_notifications);
+  List<RondaNotification> get notifications =>
+      List.unmodifiable(_notifications);
 
   /// Cek apakah petugas sedang memiliki jadwal ronda aktif pada tanggal bersangkutan
   bool isPetugasOnDuty(String userId, [DateTime? currentTime]) {
@@ -43,7 +45,10 @@ class MockBackend {
   }
 
   // 1. Auth Endpoint: POST /api/auth/login (Terenkripsi SHA-256 + Rate Limiting)
-  RondaUser login({required String whatsapp, required String password, DateTime? currentTime}) {
+  RondaUser login(
+      {required String whatsapp,
+      required String password,
+      DateTime? currentTime}) {
     final cleanPhone = whatsapp.trim().replaceAll(' ', '').replaceAll('-', '');
     final now = currentTime ?? DateTime.now();
 
@@ -57,8 +62,10 @@ class MockBackend {
     }
 
     final user = _users.firstWhere(
-      (u) => u.nomorWhatsapp.replaceAll(' ', '').replaceAll('-', '') == cleanPhone,
-      orElse: () => throw StateError('Nomor WhatsApp $whatsapp tidak terdaftar di sistem siskamling RT.'),
+      (u) =>
+          u.nomorWhatsapp.replaceAll(' ', '').replaceAll('-', '') == cleanPhone,
+      orElse: () => throw StateError(
+          'Nomor WhatsApp $whatsapp tidak terdaftar di sistem siskamling RT.'),
     );
 
     if (!user.verifyPassword(password)) {
@@ -70,7 +77,8 @@ class MockBackend {
           'Batas 5 kali percobaan salah tercapai. Akun Anda dikunci sementara selama 15 menit (ERR_AUTH_LOCKOUT).',
         );
       }
-      throw StateError('Kata sandi yang Anda masukkan salah. Percobaan gagal: $attempts/5.');
+      throw StateError(
+          'Kata sandi yang Anda masukkan salah. Percobaan gagal: $attempts/5.');
     }
 
     // Reset counter setelah login berhasil
@@ -108,15 +116,15 @@ class MockBackend {
     // Petugas HANYA dapat check-in jika terjadwal dinas pada hari ini & waktu scan berada dalam shiftnya
     if (!forceDutyOverride) {
       final userSched = _schedules.cast<PatrolSchedule?>().firstWhere(
-        (s) =>
-            s != null &&
-            s.userId == userId &&
-            !s.isLibur &&
-            s.tanggalRonda.year == now.year &&
-            s.tanggalRonda.month == now.month &&
-            s.tanggalRonda.day == now.day,
-        orElse: () => null,
-      );
+            (s) =>
+                s != null &&
+                s.userId == userId &&
+                !s.isLibur &&
+                s.tanggalRonda.year == now.year &&
+                s.tanggalRonda.month == now.month &&
+                s.tanggalRonda.day == now.day,
+            orElse: () => null,
+          );
 
       if (userSched == null) {
         throw StateError(
@@ -125,7 +133,8 @@ class MockBackend {
       }
 
       if (!userSched.isTimeInShift(now)) {
-        final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        final timeStr =
+            '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
         throw StateError(
           'Akses Ditolak: Waktu scan ($timeStr WIB) berada di luar jam dinas Anda '
           '(${userSched.shiftName}: ${userSched.jamMulai} - ${userSched.jamSelesai} WIB). '
@@ -136,7 +145,8 @@ class MockBackend {
 
     final checkpoint = _checkpoints.firstWhere(
       (c) => c.id == checkpointId,
-      orElse: () => throw ArgumentError('Checkpoint $checkpointId tidak terdaftar.'),
+      orElse: () =>
+          throw ArgumentError('Checkpoint $checkpointId tidak terdaftar.'),
     );
 
     // Verifikasi Token QR Bertanda Waktu
@@ -162,7 +172,8 @@ class MockBackend {
     );
 
     if (!geofenceResult.isValid) {
-      throw StateError('Validasi Geofence Gagal: ${geofenceResult.rejectionReason}');
+      throw StateError(
+          'Validasi Geofence Gagal: ${geofenceResult.rejectionReason}');
     }
 
     // Rekam Log Patroli
@@ -229,7 +240,8 @@ class MockBackend {
         id: 'notif-sched-${DateTime.now().millisecondsSinceEpoch}',
         rtId: rtId,
         title: 'Jadwal Ronda Ditetapkan',
-        body: 'Ketua RT telah menugaskan Anda (${user.namaLengkap}) pada $shiftName tanggal ${normalizedDate.day}/${normalizedDate.month}/${normalizedDate.year}.',
+        body:
+            'Ketua RT telah menugaskan Anda (${user.namaLengkap}) pada $shiftName tanggal ${normalizedDate.day}/${normalizedDate.month}/${normalizedDate.year}.',
         type: RondaNotificationType.scheduleUpdate,
         targetUserId: userId,
         createdAt: DateTime.now(),
@@ -245,7 +257,9 @@ class MockBackend {
     DateTime? startDate,
     int daysCount = 30,
   }) {
-    final officers = _users.where((u) => u.rtId == rtId && u.role == UserRole.petugasRonda).toList();
+    final officers = _users
+        .where((u) => u.rtId == rtId && u.role == UserRole.petugasRonda)
+        .toList();
     if (officers.isEmpty) {
       throw StateError('Tidak ada petugas ronda terdaftar di RT ini.');
     }
@@ -254,14 +268,23 @@ class MockBackend {
     final normalizedStart = DateTime(start.year, start.month, start.day);
 
     // Hapus jadwal mendatang mulai tanggal start
-    _schedules.removeWhere((s) => s.rtId == rtId && !s.tanggalRonda.isBefore(normalizedStart));
+    _schedules.removeWhere(
+        (s) => s.rtId == rtId && !s.tanggalRonda.isBefore(normalizedStart));
 
     final generated = <PatrolSchedule>[];
     const shifts = [
       {'name': 'Shift Malam (22:00 - 04:00)', 'start': '22:00', 'end': '04:00'},
-      {'name': 'Shift Dini Hari (02:00 - 08:00)', 'start': '02:00', 'end': '08:00'},
+      {
+        'name': 'Shift Dini Hari (02:00 - 08:00)',
+        'start': '02:00',
+        'end': '08:00'
+      },
       {'name': 'Shift Sore (16:00 - 23:00)', 'start': '16:00', 'end': '23:00'},
-      {'name': 'Shift Pagi-Siang (08:00 - 16:00)', 'start': '08:00', 'end': '16:00'},
+      {
+        'name': 'Shift Pagi-Siang (08:00 - 16:00)',
+        'start': '08:00',
+        'end': '16:00'
+      },
     ];
 
     // Pola 5 hari ronda + 1 hari libur (siklus 6 hari)
@@ -310,7 +333,8 @@ class MockBackend {
         id: 'notif-auto-roster-${DateTime.now().millisecondsSinceEpoch}',
         rtId: rtId,
         title: 'Jadwal Ronda Otomatis Disusun',
-        body: 'Jadwal ronda bergilir 5 hari dinas + 1 hari libur untuk $daysCount hari ke depan telah disahkan oleh Ketua RT.',
+        body:
+            'Jadwal ronda bergilir 5 hari dinas + 1 hari libur untuk $daysCount hari ke depan telah disahkan oleh Ketua RT.',
         type: RondaNotificationType.scheduleUpdate,
         includeOffDuty: true,
         createdAt: DateTime.now(),
@@ -364,14 +388,14 @@ class MockBackend {
     PatrolSchedule? targetSchedule;
     if (request.targetDate != null) {
       targetSchedule = _schedules.cast<PatrolSchedule?>().firstWhere(
-        (s) =>
-            s != null &&
-            s.userId == responderId &&
-            s.tanggalRonda.year == request.targetDate!.year &&
-            s.tanggalRonda.month == request.targetDate!.month &&
-            s.tanggalRonda.day == request.targetDate!.day,
-        orElse: () => null,
-      );
+            (s) =>
+                s != null &&
+                s.userId == responderId &&
+                s.tanggalRonda.year == request.targetDate!.year &&
+                s.tanggalRonda.month == request.targetDate!.month &&
+                s.tanggalRonda.day == request.targetDate!.day,
+            orElse: () => null,
+          );
     }
 
     ShiftSwapManager.respondByTargetUser(
@@ -388,7 +412,9 @@ class MockBackend {
       RondaNotification(
         id: 'notif-swap-${DateTime.now().millisecondsSinceEpoch}',
         rtId: schedule.rtId,
-        title: isAccepted ? 'Mutasi Jadwal: Pertukaran Disetujui' : 'Permintaan Tukar Ditolak',
+        title: isAccepted
+            ? 'Mutasi Jadwal: Pertukaran Disetujui'
+            : 'Permintaan Tukar Ditolak',
         body: isAccepted
             ? 'Pertukaran jadwal antara ${request.requesterName} dan ${request.targetUserName} disetujui oleh rekan bersangkutan dan jadwal patroli otomatis diperbarui.'
             : '${request.targetUserName} menolak permohonan tukar jadwal dari ${request.requesterName}.',
@@ -415,6 +441,10 @@ class MockBackend {
   }
 
   List<ShiftSwapRequest> get shiftSwaps => List.unmodifiable(_shiftSwaps);
+
+  void removeShiftSwap(String requestId) {
+    _shiftSwaps.removeWhere((swap) => swap.id == requestId);
+  }
 
   // 5. Emergency SOS Endpoints (Multi-Stage Lifecycle)
   EmergencyEvent triggerPanic({
@@ -445,7 +475,8 @@ class MockBackend {
         id: 'notif-sos-$eventId',
         rtId: user.rtId,
         title: 'PANGGILAN DARURAT (SOS)!',
-        body: '${user.namaLengkap} di ${user.alamatRumah} membutuhkan bantuan segera.',
+        body:
+            '${user.namaLengkap} di ${user.alamatRumah} membutuhkan bantuan segera.',
         type: RondaNotificationType.sosEmergency,
         includeOffDuty: true,
         createdAt: DateTime.now(),
@@ -583,14 +614,17 @@ class MockBackend {
   }) {
     final event = _emergencyEvents.firstWhere((e) => e.id == eventId);
     if (event.userId != userId) {
-      throw StateError('Akses Ditolak: Hanya warga pelapor yang berhak membatalkan alarm darurat ini.');
+      throw StateError(
+          'Akses Ditolak: Hanya warga pelapor yang berhak membatalkan alarm darurat ini.');
     }
     if (event.status == EmergencyStatus.selesai) {
-      throw StateError('Alarm darurat ini sudah berstatus selesai dan tidak dapat dibatalkan.');
+      throw StateError(
+          'Alarm darurat ini sudah berstatus selesai dan tidak dapat dibatalkan.');
     }
     event.status = EmergencyStatus.selesai;
     event.resolvedAt = DateTime.now();
-    event.resolutionNotes = 'DIBATALKAN PELAPOR: ${reason ?? "Alarm palsu / tidak sengaja tertekan"}';
+    event.resolutionNotes =
+        'DIBATALKAN PELAPOR: ${reason ?? "Alarm palsu / tidak sengaja tertekan"}';
   }
 
   // 6. Insiden Kejadian Berfoto: POST /api/incidents
@@ -625,9 +659,11 @@ class MockBackend {
 
   List<PatrolCheckin> get patrolLogs => List.unmodifiable(_patrolLogs);
   List<IncidentReport> get incidents => List.unmodifiable(_incidents);
-  List<EmergencyEvent> get emergencyEvents => List.unmodifiable(_emergencyEvents);
-  List<EmergencyEvent> get resolvedEmergencies =>
-      _emergencyEvents.where((e) => e.status == EmergencyStatus.selesai).toList();
+  List<EmergencyEvent> get emergencyEvents =>
+      List.unmodifiable(_emergencyEvents);
+  List<EmergencyEvent> get resolvedEmergencies => _emergencyEvents
+      .where((e) => e.status == EmergencyStatus.selesai)
+      .toList();
 
   void syncEmergencies(List<EmergencyEvent> items) {
     if (items.isEmpty) return;

@@ -25,7 +25,8 @@ class PetugasRondaDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ronda = context.watch<RondaProvider>();
-    final user = ronda.currentUser!;
+    final user = ronda.currentUser;
+    if (user == null) return const SizedBox.shrink();
 
     final activeSos = ronda.activeEmergencies;
     final overdueCps = ronda.overdueCheckpoints;

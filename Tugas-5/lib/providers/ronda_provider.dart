@@ -43,6 +43,7 @@ class RondaProvider extends ChangeNotifier {
   StreamSubscription<List<PatrolSchedule>>? _scheduleSub;
   StreamSubscription<List<RondaNotification>>? _notifSub;
   StreamSubscription<List<IncidentReport>>? _incidentSub;
+  Timer? _realtimeNotifyTimer;
 
   Position? _currentGpsPosition;
   bool _isOfflineMode = false;
@@ -251,6 +252,8 @@ class RondaProvider extends ChangeNotifier {
   // ==========================================
 
   void _cancelSubscriptions() {
+    _realtimeNotifyTimer?.cancel();
+    _realtimeNotifyTimer = null;
     _emergencySub?.cancel();
     _emergencySub = null;
     _checkinSub?.cancel();
@@ -263,6 +266,15 @@ class RondaProvider extends ChangeNotifier {
     _notifSub = null;
     _incidentSub?.cancel();
     _incidentSub = null;
+  }
+
+  /// Coalesce bursts from initial Realtime snapshots into one dashboard rebuild.
+  void _notifyRealtimeListeners() {
+    if (_realtimeNotifyTimer?.isActive ?? false) return;
+    _realtimeNotifyTimer = Timer(const Duration(milliseconds: 60), () {
+      _realtimeNotifyTimer = null;
+      notifyListeners();
+    });
   }
 
   Future<void> _initSupabaseRealtime(String rtId) async {
@@ -318,42 +330,42 @@ class RondaProvider extends ChangeNotifier {
       _emergencySub = _supabase.streamEmergencies(rtId).listen((items) {
         if (items.isNotEmpty) {
           _backend.syncEmergencies(items);
-          notifyListeners();
+          _notifyRealtimeListeners();
         }
       }, onError: (e) => debugPrint('Realtime Emergency Error: $e'));
 
       _checkinSub = _supabase.streamCheckins().listen((items) {
         if (items.isNotEmpty) {
           _backend.syncPatrolLogs(items);
-          notifyListeners();
+          _notifyRealtimeListeners();
         }
       }, onError: (e) => debugPrint('Realtime Checkin Error: $e'));
 
       _swapSub = _supabase.streamShiftSwaps(rtId).listen((items) {
         if (items.isNotEmpty) {
           _backend.syncShiftSwaps(items);
-          notifyListeners();
+          _notifyRealtimeListeners();
         }
       }, onError: (e) => debugPrint('Realtime Swap Error: $e'));
 
       _scheduleSub = _supabase.streamSchedules(rtId).listen((items) {
         if (items.isNotEmpty) {
           _backend.syncSchedules(items);
-          notifyListeners();
+          _notifyRealtimeListeners();
         }
       }, onError: (e) => debugPrint('Realtime Schedule Error: $e'));
 
       _notifSub = _supabase.streamNotifications(rtId).listen((items) {
         if (items.isNotEmpty) {
           _backend.syncNotifications(items);
-          notifyListeners();
+          _notifyRealtimeListeners();
         }
       }, onError: (e) => debugPrint('Realtime Notif Error: $e'));
 
       _incidentSub = _supabase.streamIncidents(rtId).listen((items) {
         if (items.isNotEmpty) {
           _backend.syncIncidents(items);
-          notifyListeners();
+          _notifyRealtimeListeners();
         }
       }, onError: (e) => debugPrint('Realtime Incident Error: $e'));
     } catch (e) {

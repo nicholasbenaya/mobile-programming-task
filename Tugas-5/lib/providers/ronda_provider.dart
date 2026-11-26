@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
@@ -20,9 +21,12 @@ class RondaProvider extends ChangeNotifier {
     _backend = backend ?? MockBackend();
     _supabase = supabaseService ?? SupabaseRondaService();
     _offlineQueue = OfflineSyncQueue();
-    // Default state awal: Pengguna belum login untuk menjamin keamanan kredensial
-    _currentUser = null;
+    _currentUser = _supabase.currentRondaUser;
     _checkpoints = SeedData.checkpoints;
+    if (_currentUser case final user?) {
+      _checkpoints = _backend.getCheckpoints(user.rtId);
+      unawaited(_initSupabaseRealtime(user.rtId));
+    }
   }
 
   late final MockBackend _backend;
@@ -31,12 +35,15 @@ class RondaProvider extends ChangeNotifier {
   RondaUser? _currentUser;
   late List<Checkpoint> _checkpoints;
   final List<RondaUser> _cloudUsers = [];
+  final Map<String, Future<String>> _photoUrlCache = {};
 
   StreamSubscription<List<EmergencyEvent>>? _emergencySub;
   StreamSubscription<List<PatrolCheckin>>? _checkinSub;
   StreamSubscription<List<ShiftSwapRequest>>? _swapSub;
   StreamSubscription<List<PatrolSchedule>>? _scheduleSub;
   StreamSubscription<List<RondaNotification>>? _notifSub;
+  StreamSubscription<List<IncidentReport>>? _incidentSub;
+  Timer? _realtimeNotifyTimer;
 
   Position? _currentGpsPosition;
   bool _isOfflineMode = false;
@@ -68,6 +75,28 @@ class RondaProvider extends ChangeNotifier {
   List<EmergencyEvent> get emergencyEvents => _backend.emergencyEvents;
   List<EmergencyEvent> get resolvedEmergencies => _backend.resolvedEmergencies;
   List<RondaNotification> get notifications => _backend.notifications;
+
+  /// Simpan foto bukti ke bucket privat; memerlukan sesi Supabase pengguna.
+  Future<String> uploadRondaPhoto(File photo) {
+    final user = _currentUser;
+    if (user == null) throw StateError('Silakan masuk terlebih dahulu.');
+    return _supabase.uploadRondaPhoto(photo, rtId: user.rtId);
+  }
+
+  Future<String> rondaPhotoUrl(String path) => _photoUrlCache.putIfAbsent(
+        path,
+        () async {
+          try {
+            return await _supabase.createRondaPhotoUrl(path);
+          } catch (_) {
+            _photoUrlCache.remove(path);
+            rethrow;
+          }
+        },
+      );
+
+  Future<void> deleteRondaPhoto(String path) =>
+      _supabase.deleteRondaPhoto(path);
 
   /// Permintaan tukar jadwal yang masuk (ditujukan kepada saya & masih pending)
   List<ShiftSwapRequest> get myIncomingSwapRequests {
@@ -223,6 +252,8 @@ class RondaProvider extends ChangeNotifier {
   // ==========================================
 
   void _cancelSubscriptions() {
+    _realtimeNotifyTimer?.cancel();
+    _realtimeNotifyTimer = null;
     _emergencySub?.cancel();
     _emergencySub = null;
     _checkinSub?.cancel();
@@ -233,6 +264,17 @@ class RondaProvider extends ChangeNotifier {
     _scheduleSub = null;
     _notifSub?.cancel();
     _notifSub = null;
+    _incidentSub?.cancel();
+    _incidentSub = null;
+  }
+
+  /// Coalesce bursts from initial Realtime snapshots into one dashboard rebuild.
+  void _notifyRealtimeListeners() {
+    if (_realtimeNotifyTimer?.isActive ?? false) return;
+    _realtimeNotifyTimer = Timer(const Duration(milliseconds: 60), () {
+      _realtimeNotifyTimer = null;
+      notifyListeners();
+    });
   }
 
   Future<void> _initSupabaseRealtime(String rtId) async {
@@ -288,37 +330,44 @@ class RondaProvider extends ChangeNotifier {
       _emergencySub = _supabase.streamEmergencies(rtId).listen((items) {
         if (items.isNotEmpty) {
           _backend.syncEmergencies(items);
-          notifyListeners();
+          _notifyRealtimeListeners();
         }
       }, onError: (e) => debugPrint('Realtime Emergency Error: $e'));
 
       _checkinSub = _supabase.streamCheckins().listen((items) {
         if (items.isNotEmpty) {
           _backend.syncPatrolLogs(items);
-          notifyListeners();
+          _notifyRealtimeListeners();
         }
       }, onError: (e) => debugPrint('Realtime Checkin Error: $e'));
 
       _swapSub = _supabase.streamShiftSwaps(rtId).listen((items) {
         if (items.isNotEmpty) {
           _backend.syncShiftSwaps(items);
-          notifyListeners();
+          _notifyRealtimeListeners();
         }
       }, onError: (e) => debugPrint('Realtime Swap Error: $e'));
 
       _scheduleSub = _supabase.streamSchedules(rtId).listen((items) {
         if (items.isNotEmpty) {
           _backend.syncSchedules(items);
-          notifyListeners();
+          _notifyRealtimeListeners();
         }
       }, onError: (e) => debugPrint('Realtime Schedule Error: $e'));
 
       _notifSub = _supabase.streamNotifications(rtId).listen((items) {
         if (items.isNotEmpty) {
           _backend.syncNotifications(items);
-          notifyListeners();
+          _notifyRealtimeListeners();
         }
       }, onError: (e) => debugPrint('Realtime Notif Error: $e'));
+
+      _incidentSub = _supabase.streamIncidents(rtId).listen((items) {
+        if (items.isNotEmpty) {
+          _backend.syncIncidents(items);
+          _notifyRealtimeListeners();
+        }
+      }, onError: (e) => debugPrint('Realtime Incident Error: $e'));
     } catch (e) {
       debugPrint('Supabase initial sync warning: $e');
     }
@@ -328,21 +377,24 @@ class RondaProvider extends ChangeNotifier {
   // 1. AUTENTIKASI AMAN & TERENKRIPSI
   // ==========================================
 
-  /// Login resmi dengan nomor WhatsApp dan kata sandi terenkripsi
+  /// Login akun Ronda melalui Supabase Auth dengan nomor WhatsApp dan password.
   Future<bool> login(
       {required String whatsapp, required String password}) async {
     _lastErrorMessage = null;
     _lastSuccessMessage = null;
 
     try {
-      final user = _backend.login(whatsapp: whatsapp, password: password);
+      final user = await _supabase.signInRondaUser(
+        whatsapp: whatsapp,
+        password: password,
+      );
       _currentUser = user;
       _checkpoints = _backend.getCheckpoints(user.rtId);
       _lastSuccessMessage =
           'Login Berhasil: Selamat datang, ${user.namaLengkap}!';
       notifyListeners();
 
-      // Inisialisasi Realtime & Sinkronisasi Cloud jika Supabase terhubung
+      // Muat data RT dan mulai subscription setelah sesi Supabase aktif.
       unawaited(_initSupabaseRealtime(user.rtId));
       return true;
     } catch (e) {
@@ -364,6 +416,8 @@ class RondaProvider extends ChangeNotifier {
   /// Keluar dari sesi pengguna
   void logout() {
     _cancelSubscriptions();
+    unawaited(_supabase.signOutRondaUser());
+    _photoUrlCache.clear();
     _currentUser = null;
     _lastErrorMessage = null;
     _lastSuccessMessage = 'Sesi telah berakhir. Silakan login kembali.';
@@ -784,12 +838,12 @@ class RondaProvider extends ChangeNotifier {
   // 4. LAPORAN TEMUAN INSIDEN BERFOTO
   // ==========================================
 
-  void reportIncident({
+  Future<bool> reportIncident({
     required IncidentCategory category,
     required String keterangan,
     required String photoPath,
-  }) {
-    if (_currentUser == null) return;
+  }) async {
+    if (_currentUser == null) return false;
     final lat = _currentGpsPosition?.latitude ?? -7.281970;
     final lon = _currentGpsPosition?.longitude ?? 112.795323;
 
@@ -804,20 +858,26 @@ class RondaProvider extends ChangeNotifier {
       compass: 90.0,
     );
 
-    if (_supabase.isAvailable) {
-      unawaited(_supabase.insertIncident(report));
+    try {
+      await _supabase.insertIncident(report);
+      _lastErrorMessage = null;
+      _lastSuccessMessage =
+          'Laporan insiden dan foto berhasil dikirim ke Linimasa Keamanan RT.';
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _backend.removeIncident(report.id);
+      _lastErrorMessage = 'Gagal mengirim laporan ke Supabase: $e';
+      notifyListeners();
+      return false;
     }
-
-    _lastSuccessMessage =
-        'Laporan insiden berhasil dikirim ke Linimasa Keamanan RT.';
-    notifyListeners();
   }
 
   // ==========================================
   // 5. TUKAR JADWAL (SHIFT SWAP) LENGKAP
   // ==========================================
 
-  Future<void> requestShiftSwap({
+  Future<bool> requestShiftSwap({
     required String scheduleId,
     required String targetUserId,
     required String alasan,
@@ -825,7 +885,15 @@ class RondaProvider extends ChangeNotifier {
     DateTime? targetDate,
     String? targetShift,
   }) async {
-    if (_currentUser == null) return;
+    if (_currentUser == null) return false;
+    if (!_supabase.isAvailable) {
+      _lastSuccessMessage = null;
+      _lastErrorMessage =
+          'Tukar jadwal antar pengguna belum tersambung. Supabase belum tersedia; permintaan tidak dikirim.';
+      notifyListeners();
+      return false;
+    }
+    ShiftSwapRequest? pendingSwap;
     try {
       final swap = _backend.requestShiftSwap(
         requestId: _uuid.v4(),
@@ -837,20 +905,28 @@ class RondaProvider extends ChangeNotifier {
         targetDate: targetDate,
         targetShift: targetShift,
       );
+      pendingSwap = swap;
 
-      if (!_supabase.isAvailable) {
-        _lastErrorMessage =
-            'Permintaan tersimpan di perangkat ini saja. Atur URL dan anon key Supabase agar tersambung antar pengguna.';
+      await _supabase.insertShiftSwap(swap);
+      _lastErrorMessage = null;
+      _lastSuccessMessage =
+          'Permintaan tukar jadwal terkirim ke petugas pengganti.';
+      notifyListeners();
+      return true;
+    } catch (e) {
+      if (pendingSwap != null) _backend.removeShiftSwap(pendingSwap.id);
+      _lastSuccessMessage = null;
+      if (e is StateError || e is ArgumentError) {
+        _lastErrorMessage = e
+            .toString()
+            .replaceFirst('Bad state: ', '')
+            .replaceFirst('Invalid argument(s): ', '');
       } else {
-        await _supabase.insertShiftSwap(swap);
-        _lastSuccessMessage =
-            'Permintaan tukar jadwal tersimpan dan terkirim ke petugas pengganti.';
+        _lastErrorMessage =
+            'Permintaan tidak terkirim ke petugas. Periksa tabel shift_swaps dan policy RLS Supabase. ($e)';
       }
       notifyListeners();
-    } catch (e) {
-      _lastErrorMessage =
-          'Permintaan ada di perangkat ini, tetapi gagal disinkronkan: $e';
-      notifyListeners();
+      return false;
     }
   }
 

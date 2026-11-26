@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -19,7 +17,8 @@ class AdminRtDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ronda = context.watch<RondaProvider>();
-    final user = ronda.currentUser!;
+    final user = ronda.currentUser;
+    if (user == null) return const SizedBox.shrink();
 
     final activeSos = ronda.emergencyEvents.where((e) => e.isActive).toList();
     final pendingSwaps = ronda.shiftSwaps
@@ -711,6 +710,24 @@ class AdminRtDashboard extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 12, color: Colors.purple.shade800),
                     ),
+                    if (event.resolutionPhotoPath case final photoPath?) ...[
+                      const SizedBox(height: 8),
+                      FutureBuilder<String>(
+                        future: ronda.rondaPhotoUrl(photoPath),
+                        builder: (context, snapshot) => snapshot.hasData
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  snapshot.data!,
+                                  height: 150,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _missingIncidentPhoto(size: 150),
+                                ),
+                              )
+                            : _missingIncidentPhoto(size: 150),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -1268,20 +1285,32 @@ class AdminRtDashboard extends StatelessWidget {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(inc.photoPath),
-                        width: 64,
-                        height: 64,
-                        fit: BoxFit.cover,
-                        cacheWidth: 128,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          width: 64,
-                          height: 64,
-                          color: Colors.grey.shade200,
-                          alignment: Alignment.center,
-                          child: const Icon(Icons.image_not_supported_outlined,
-                              color: Colors.grey),
-                        ),
+                      child: FutureBuilder<String>(
+                        future: ronda.rondaPhotoUrl(inc.photoPath),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData) {
+                            return Image.network(
+                              snapshot.data!,
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.cover,
+                              cacheWidth: 128,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _missingIncidentPhoto(),
+                            );
+                          }
+                          if (snapshot.hasError) return _missingIncidentPhoto();
+                          return Container(
+                            width: 64,
+                            height: 64,
+                            color: Colors.grey.shade200,
+                            alignment: Alignment.center,
+                            child: const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1313,6 +1342,14 @@ class AdminRtDashboard extends StatelessWidget {
     );
   }
 }
+
+Widget _missingIncidentPhoto({double size = 64}) => Container(
+      width: size,
+      height: size,
+      color: Colors.grey.shade200,
+      alignment: Alignment.center,
+      child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
+    );
 
 class _StatCard extends StatelessWidget {
   const _StatCard({

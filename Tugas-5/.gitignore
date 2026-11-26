@@ -7,6 +7,8 @@ lib/core/config/secrets.dart
 lib/core/config/secret.dart
 .env
 .env.*
+node_modules/
+npm-debug.log*
 *.keystore
 *.jks
 key.properties

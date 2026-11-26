@@ -80,7 +80,6 @@ class SeedData {
         petugasDevi,
         petugasBudi,
         wargaFito,
-        wargaRisqi,
       ];
 
   // 2. Data Titik Checkpoint Pos Patroli Fisik Lingkungan

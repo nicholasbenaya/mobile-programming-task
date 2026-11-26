@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/errors/app_exception.dart';
+import '../../../data/services/image_service.dart';
 import '../../../domain/ronda/models/ronda_models.dart';
 import '../../../providers/ronda_provider.dart';
 import 'widgets/patrol_calendar_widget.dart';
@@ -53,7 +58,8 @@ class _WargaDashboardState extends State<WargaDashboard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ronda = context.watch<RondaProvider>();
-    final user = ronda.currentUser!;
+    final user = ronda.currentUser;
+    if (user == null) return const SizedBox.shrink();
     final myEmergency = ronda.myActiveEmergency;
 
     return Scaffold(
@@ -544,12 +550,34 @@ class _WargaDashboardState extends State<WargaDashboard> {
 
   void _showReportCivicDialog(BuildContext context, RondaProvider ronda) {
     final noteController = TextEditingController();
+    final imageService = ImageService();
     IncidentCategory selectedCategory = IncidentCategory.fasilitasRusak;
+    File? selectedPhoto;
+    bool isPickingPhoto = false;
+    bool isSubmitting = false;
+    String? formError;
 
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
+          Future<void> choosePhoto(ImageSource source) async {
+            setDialogState(() {
+              isPickingPhoto = true;
+              formError = null;
+            });
+            try {
+              final photo = await imageService.pick(source);
+              if (photo != null && ctx.mounted) {
+                setDialogState(() => selectedPhoto = photo);
+              }
+            } on AppException catch (error) {
+              if (ctx.mounted) setDialogState(() => formError = error.message);
+            } finally {
+              if (ctx.mounted) setDialogState(() => isPickingPhoto = false);
+            }
+          }
+
           return AlertDialog(
             title: const Row(
               children: [
@@ -616,69 +644,115 @@ class _WargaDashboardState extends State<WargaDashboard> {
                     maxLines: 3,
                   ),
                   const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                  if (selectedPhoto case final photo?)
+                    ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.photo_camera, size: 20, color: Colors.grey),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Foto bukti lampiran kamera otomatis disertakan via GPS.',
-                            style:
-                                TextStyle(fontSize: 11, color: Colors.black87),
-                          ),
+                      child: Image.file(photo, height: 150, fit: BoxFit.cover),
+                    )
+                  else
+                    const Text('Foto bukti wajib dilampirkan.',
+                        style: TextStyle(fontSize: 12)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: isPickingPhoto || isSubmitting
+                              ? null
+                              : () => choosePhoto(ImageSource.camera),
+                          icon: const Icon(Icons.camera_alt_outlined),
+                          label: const Text('Kamera'),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: isPickingPhoto || isSubmitting
+                              ? null
+                              : () => choosePhoto(ImageSource.gallery),
+                          icon: const Icon(Icons.photo_library_outlined),
+                          label: const Text('Galeri'),
+                        ),
+                      ),
+                    ],
                   ),
+                  if (formError != null) ...[
+                    const SizedBox(height: 6),
+                    Text(formError!,
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 12)),
+                  ],
                 ],
               ),
             ),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.pop(ctx),
+                  onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
                   child: const Text('Batal')),
               FilledButton(
                 style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primaryLight),
-                onPressed: () {
-                  final text = noteController.text.trim();
-                  if (text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Harap tuliskan keterangan laporan.')),
-                    );
-                    return;
-                  }
-                  Navigator.pop(ctx);
-                  ronda.reportIncident(
-                    category: selectedCategory,
-                    keterangan: text,
-                    photoPath:
-                        '/storage/emulated/0/DCIM/laporan_warga_${DateTime.now().millisecondsSinceEpoch}.jpg',
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'Laporan warga berhasil dikirim ke Pengurus RT & Petugas Ronda!'),
-                      backgroundColor: AppColors.verified,
-                    ),
-                  );
-                },
-                child: const Text('Kirim Laporan'),
+                onPressed: isSubmitting || isPickingPhoto
+                    ? null
+                    : () async {
+                        final text = noteController.text.trim();
+                        if (text.isEmpty || selectedPhoto == null) {
+                          setDialogState(() => formError = text.isEmpty
+                              ? 'Harap tuliskan keterangan laporan.'
+                              : 'Pilih foto bukti terlebih dahulu.');
+                          return;
+                        }
+                        setDialogState(() {
+                          isSubmitting = true;
+                          formError = null;
+                        });
+                        String? photoPath;
+                        try {
+                          photoPath =
+                              await ronda.uploadRondaPhoto(selectedPhoto!);
+                          final sent = await ronda.reportIncident(
+                            category: selectedCategory,
+                            keterangan: text,
+                            photoPath: photoPath,
+                          );
+                          if (!sent) {
+                            await ronda.deleteRondaPhoto(photoPath);
+                            throw StateError(ronda.lastErrorMessage ??
+                                'Laporan gagal dikirim ke Supabase.');
+                          }
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content:
+                                  Text('Laporan dan foto berhasil dikirim.'),
+                              backgroundColor: AppColors.verified,
+                            ),
+                          );
+                        } catch (error) {
+                          if (ctx.mounted) {
+                            setDialogState(() {
+                              isSubmitting = false;
+                              formError = error
+                                  .toString()
+                                  .replaceFirst('Bad state: ', '');
+                            });
+                          }
+                        }
+                      },
+                child: isSubmitting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Kirim Laporan'),
               ),
             ],
           );
         },
       ),
-    );
+    ).whenComplete(noteController.dispose);
   }
 
   Widget _buildCivicIncidentsHistory(

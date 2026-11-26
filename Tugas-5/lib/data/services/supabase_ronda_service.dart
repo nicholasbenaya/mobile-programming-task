@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/ronda/models/ronda_models.dart';
+import '../repositories/ronda_photo_repository.dart';
 import 'supabase_service.dart';
 
 /// Layanan Komunikasi Data Cloud Supabase untuk Ekosistem Ronda Digital
@@ -14,6 +16,90 @@ class SupabaseRondaService {
 
   SupabaseClient? get client => _client ?? SupabaseService.clientOrNull;
   bool get isAvailable => client != null;
+
+  static const rondaRtId = 'RT-04-RW-02-SUKOLILO';
+
+  String _rondaEmail(String whatsapp) {
+    final digits = whatsapp.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 8) {
+      throw const FormatException('Nomor WhatsApp tidak valid.');
+    }
+    return 'ronda.$digits@example.com';
+  }
+
+  Future<RondaUser> signInRondaUser({
+    required String whatsapp,
+    required String password,
+  }) async {
+    final c = client;
+    if (c == null) throw StateError('Supabase belum dikonfigurasi.');
+    final response = await c.auth.signInWithPassword(
+      email: _rondaEmail(whatsapp),
+      password: password,
+    );
+    final user = response.user;
+    if (user == null) throw StateError('Supabase tidak mengembalikan akun.');
+    return _rondaUserFromAuth(user);
+  }
+
+  RondaUser? get currentRondaUser {
+    final user = client?.auth.currentUser;
+    if (user == null) return null;
+    try {
+      return _rondaUserFromAuth(user);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  RondaUser _rondaUserFromAuth(User user) {
+    final claims = user.appMetadata;
+    final role = claims['role'] as String?;
+    final rondaId = claims['ronda_user_id'] as String?;
+    final rtId = claims['rt_id'] as String?;
+    final whatsapp = claims['whatsapp'] as String?;
+    final name = claims['full_name'] as String?;
+    final address = claims['address'] as String?;
+    if (role == null ||
+        rondaId == null ||
+        rtId == null ||
+        whatsapp == null ||
+        name == null ||
+        address == null) {
+      throw StateError(
+          'Metadata akun Supabase belum memiliki profil Ronda lengkap.');
+    }
+    return RondaUser(
+      id: rondaId,
+      rtId: rtId,
+      namaLengkap: name,
+      nomorWhatsapp: whatsapp,
+      alamatRumah: address,
+      role: UserRole.fromString(role),
+      fcmToken: claims['fcm_token'] as String?,
+    );
+  }
+
+  Future<void> signOutRondaUser() async {
+    final c = client;
+    if (c != null && c.auth.currentSession != null) await c.auth.signOut();
+  }
+
+  late final RondaPhotoRepository _rondaPhotos = _createRondaPhotoRepository();
+
+  RondaPhotoRepository _createRondaPhotoRepository() {
+    final c = client;
+    if (c == null) throw StateError('Supabase belum dikonfigurasi.');
+    return RondaPhotoRepository(c);
+  }
+
+  Future<String> uploadRondaPhoto(File photo, {required String rtId}) =>
+      _rondaPhotos.upload(photo: photo, rtId: rtId);
+
+  Future<String> createRondaPhotoUrl(String path) =>
+      _rondaPhotos.signedUrl(path);
+
+  Future<void> deleteRondaPhoto(String path) => _rondaPhotos.delete(path);
 
   // ==========================================
   // 1. DATA PENGGUNA & POS CHECKPOINT
@@ -207,13 +293,17 @@ class SupabaseRondaService {
   Future<void> insertShiftSwap(ShiftSwapRequest swap) async {
     final c = client;
     if (c == null) throw StateError('Supabase belum dikonfigurasi.');
-    await c.from('shift_swaps').upsert(swap.toJson());
+    await c.from('shift_swaps').insert(swap.toJson());
   }
 
   Future<void> updateShiftSwap(ShiftSwapRequest swap) async {
     final c = client;
     if (c == null) throw StateError('Supabase belum dikonfigurasi.');
-    await c.from('shift_swaps').upsert(swap.toJson());
+    await c
+        .from('shift_swaps')
+        .update(swap.toJson())
+        .eq('id', swap.id)
+        .eq('rt_id', swap.rtId);
   }
 
   Stream<List<ShiftSwapRequest>> streamShiftSwaps(String rtId) {
@@ -248,12 +338,19 @@ class SupabaseRondaService {
 
   Future<void> insertIncident(IncidentReport incident) async {
     final c = client;
-    if (c == null) return;
-    try {
-      await c.from('incident_reports').insert(incident.toJson());
-    } catch (e) {
-      debugPrint('Error insertIncident: $e');
-    }
+    if (c == null) throw StateError('Supabase belum dikonfigurasi.');
+    await c.from('incident_reports').insert(incident.toJson());
+  }
+
+  Stream<List<IncidentReport>> streamIncidents(String rtId) {
+    final c = client;
+    if (c == null) return const Stream.empty();
+    return c
+        .from('incident_reports')
+        .stream(primaryKey: ['id'])
+        .eq('rt_id', rtId)
+        .map(
+            (rows) => rows.map((row) => IncidentReport.fromJson(row)).toList());
   }
 
   // ==========================================

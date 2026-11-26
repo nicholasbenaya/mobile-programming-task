@@ -34,7 +34,8 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Kredensial ${user.namaLengkap} (${user.role.label}) dimuat.'),
+        content:
+            Text('Kredensial ${user.namaLengkap} (${user.role.label}) dimuat.'),
         duration: const Duration(seconds: 1),
       ),
     );
@@ -130,12 +131,14 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                            Icon(Icons.error_outline,
+                                color: Colors.red.shade700, size: 20),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 ronda.lastErrorMessage!,
-                                style: TextStyle(color: Colors.red.shade800, fontSize: 13),
+                                style: TextStyle(
+                                    color: Colors.red.shade800, fontSize: 13),
                               ),
                             ),
                           ],
@@ -144,7 +147,7 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                       const SizedBox(height: 16),
                     ],
 
-                    // 3. Form Input Nomor WhatsApp & Kata Sandi
+                    // 3. Login Supabase Auth dengan pemetaan nomor WhatsApp
                     TextFormField(
                       controller: _whatsappController,
                       keyboardType: TextInputType.phone,
@@ -152,7 +155,8 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                         labelText: 'Nomor WhatsApp Terdaftar',
                         hintText: 'Contoh: 081234567802',
                         prefixIcon: const Icon(Icons.phone_android),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -169,16 +173,20 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
-                        labelText: 'Kata Sandi (Terenkripsi SHA-256)',
+                        labelText: 'Kata Sandi Akun',
                         hintText: 'Masukkan kata sandi akun',
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                           ),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
                         ),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -198,12 +206,16 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
                               )
                             : const Icon(Icons.login),
                         label: Text(
-                          _isLoading ? 'Memverifikasi...' : 'Masuk ke Sistem Keamanan',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          _isLoading
+                              ? 'Memverifikasi...'
+                              : 'Masuk ke Sistem Keamanan',
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -212,10 +224,12 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                     // 5. Akun Uji Coba Demo Penguji (Memudahkan Penguji Tanpa Mengorbankan Enkripsi)
                     Card(
                       elevation: 0,
-                      color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withAlpha(120),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant),
+                        side:
+                            BorderSide(color: theme.colorScheme.outlineVariant),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -224,12 +238,15 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.badge_outlined, size: 20, color: theme.colorScheme.primary),
+                                Icon(Icons.badge_outlined,
+                                    size: 20, color: theme.colorScheme.primary),
                                 const SizedBox(width: 8),
                                 const Expanded(
                                   child: Text(
                                     'Pilihan Akun Demo (Klik untuk Autofill)',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13),
                                   ),
                                 ),
                               ],
@@ -237,7 +254,9 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                             const SizedBox(height: 4),
                             Text(
                               'Pilih profil di bawah untuk mengisi kredensial secara otomatis, lalu tekan tombol Masuk:',
-                              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurfaceVariant),
                             ),
                             const SizedBox(height: 12),
                             Wrap(
@@ -245,7 +264,8 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                               runSpacing: 8,
                               children: ronda.availableUsers.map((user) {
                                 final isKetua = user.role == UserRole.adminRt;
-                                final isPetugas = user.role == UserRole.petugasRonda;
+                                final isPetugas =
+                                    user.role == UserRole.petugasRonda;
 
                                 Color chipColor;
                                 if (isKetua) {
@@ -261,7 +281,8 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                                     backgroundColor: chipColor,
                                     child: Text(
                                       user.namaLengkap[0],
-                                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 11),
                                     ),
                                   ),
                                   label: Text(
@@ -276,7 +297,10 @@ class _RondaLoginScreenState extends State<RondaLoginScreen> {
                             const Center(
                               child: Text(
                                 'Kata sandi default: password123',
-                                style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontStyle: FontStyle.italic,
+                                    color: Colors.grey),
                               ),
                             ),
                           ],

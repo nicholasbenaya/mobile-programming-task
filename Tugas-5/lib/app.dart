@@ -47,19 +47,31 @@ class _RoleRouterGate extends StatelessWidget {
     final ronda = context.watch<RondaProvider>();
     final user = ronda.currentUser;
 
-    // 1. Jika belum login, tampilkan layar masuk resmi terenkripsi
+    // Keep MaterialApp/Navigator stable while the login screen is replaced.
+    // This avoids tearing down the focused login subtree in the same frame as
+    // provider notifications (notably while Android is dismissing the keyboard).
+    final Widget screen;
+    final Key screenKey;
     if (user == null) {
-      return const RondaLoginScreen();
+      screen = const RondaLoginScreen();
+      screenKey = const ValueKey('ronda-login');
+    } else {
+      screenKey = ValueKey('ronda-${user.role.name}');
+      switch (user.role) {
+        case UserRole.adminRt:
+          screen = const AdminRtDashboard();
+        case UserRole.petugasRonda:
+          screen = const PetugasRondaDashboard();
+        case UserRole.warga:
+          screen = const WargaDashboard();
+      }
     }
 
-    // 2. Jika sudah terautentikasi, alihkan ke tampilan utama yang disesuaikan per peran
-    switch (user.role) {
-      case UserRole.adminRt:
-        return const AdminRtDashboard();
-      case UserRole.petugasRonda:
-        return const PetugasRondaDashboard();
-      case UserRole.warga:
-        return const WargaDashboard();
-    }
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      child: KeyedSubtree(key: screenKey, child: screen),
+    );
   }
 }

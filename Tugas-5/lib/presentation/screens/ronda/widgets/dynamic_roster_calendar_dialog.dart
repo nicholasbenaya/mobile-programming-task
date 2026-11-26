@@ -39,10 +39,12 @@ class DynamicRosterCalendarDialog extends StatefulWidget {
   }
 
   @override
-  State<DynamicRosterCalendarDialog> createState() => _DynamicRosterCalendarDialogState();
+  State<DynamicRosterCalendarDialog> createState() =>
+      _DynamicRosterCalendarDialogState();
 }
 
-class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialog> {
+class _DynamicRosterCalendarDialogState
+    extends State<DynamicRosterCalendarDialog> {
   late DateTime _selectedDate;
   late DateTime _displayedMonth;
 
@@ -56,13 +58,22 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
   // State untuk permohonan tukar petugas
   PatrolSchedule? _selectedMySchedule;
   PatrolSchedule? _selectedColleagueSchedule;
+  bool _isSubmittingSwap = false;
   final TextEditingController _swapReasonController = TextEditingController();
 
   static const List<Map<String, String>> _shiftPresets = [
     {'name': 'Shift Malam (22:00 - 04:00)', 'start': '22:00', 'end': '04:00'},
-    {'name': 'Shift Dini Hari (02:00 - 08:00)', 'start': '02:00', 'end': '08:00'},
+    {
+      'name': 'Shift Dini Hari (02:00 - 08:00)',
+      'start': '02:00',
+      'end': '08:00'
+    },
     {'name': 'Shift Sore (16:00 - 23:00)', 'start': '16:00', 'end': '23:00'},
-    {'name': 'Shift Pagi-Siang (08:00 - 16:00)', 'start': '08:00', 'end': '16:00'},
+    {
+      'name': 'Shift Pagi-Siang (08:00 - 16:00)',
+      'start': '08:00',
+      'end': '16:00'
+    },
   ];
 
   @override
@@ -81,13 +92,15 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
 
   void _previousMonth() {
     setState(() {
-      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month - 1, 1);
+      _displayedMonth =
+          DateTime(_displayedMonth.year, _displayedMonth.month - 1, 1);
     });
   }
 
   void _nextMonth() {
     setState(() {
-      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month + 1, 1);
+      _displayedMonth =
+          DateTime(_displayedMonth.year, _displayedMonth.month + 1, 1);
     });
   }
 
@@ -105,10 +118,17 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
     // Jadwal pada tanggal terpilih
     final schedulesForDay = ronda.getSchedulesForDate(_selectedDate);
 
-    // Jadwal saya untuk penukaran
+    // Jangan tawarkan jadwal yang sudah melewati batas pengajuan H-3 jam.
+    final now = DateTime.now();
     final mySchedules = ronda.schedules
-        .where((s) => s.userId == currentUser?.id && !s.isLibur && !s.isCompleted)
+        .where((s) =>
+            s.userId == currentUser?.id &&
+            !s.isLibur &&
+            !s.isCompleted &&
+            now.isBefore(s.startDateTime.subtract(const Duration(hours: 3))))
         .toList();
+    final selectedMySchedule =
+        mySchedules.where((s) => s.id == _selectedMySchedule?.id).firstOrNull;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -135,7 +155,8 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
                       widget.mode == CalendarDialogMode.adminAssign
                           ? 'Penugasan Jadwal Ronda RT'
                           : 'Pilih Jadwal Rekan untuk Ditukar',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ),
                   IconButton(
@@ -156,7 +177,8 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
                   ),
                   Text(
                     DateFormat('MMMM yyyy', 'id_ID').format(_displayedMonth),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                   IconButton(
                     icon: const Icon(Icons.chevron_right),
@@ -171,7 +193,8 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
 
               // Selected Date Summary Bar
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(8),
@@ -179,8 +202,10 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
                 child: Row(
                   children: [
                     Text(
-                      DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(_selectedDate),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      DateFormat('EEEE, dd MMM yyyy', 'id_ID')
+                          .format(_selectedDate),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     const Spacer(),
                     Text(
@@ -199,8 +224,10 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
               // Content Area by Mode
               Expanded(
                 child: widget.mode == CalendarDialogMode.adminAssign
-                    ? _buildAdminAssignSection(context, ronda, officers, schedulesForDay)
-                    : _buildOfficerSwapSection(context, ronda, mySchedules, schedulesForDay),
+                    ? _buildAdminAssignSection(
+                        context, ronda, officers, schedulesForDay)
+                    : _buildOfficerSwapSection(context, ronda, mySchedules,
+                        schedulesForDay, selectedMySchedule),
               ),
             ],
           ),
@@ -210,8 +237,11 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
   }
 
   Widget _buildCalendarGrid(RondaProvider ronda) {
-    final daysInMonth = DateUtils.getDaysInMonth(_displayedMonth.year, _displayedMonth.month);
-    final firstDayOfWeek = DateTime(_displayedMonth.year, _displayedMonth.month, 1).weekday; // 1 = Monday
+    final daysInMonth =
+        DateUtils.getDaysInMonth(_displayedMonth.year, _displayedMonth.month);
+    final firstDayOfWeek =
+        DateTime(_displayedMonth.year, _displayedMonth.month, 1)
+            .weekday; // 1 = Monday
     final totalCells = ((daysInMonth + firstDayOfWeek - 1) / 7).ceil() * 7;
 
     const weekdays = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
@@ -226,7 +256,10 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
                     child: Center(
                       child: Text(
                         d,
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey),
                       ),
                     ),
                   ))
@@ -250,31 +283,51 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
             }
 
             final day = dayOffset + 1;
-            final date = DateTime(_displayedMonth.year, _displayedMonth.month, day);
+            final date =
+                DateTime(_displayedMonth.year, _displayedMonth.month, day);
             final isSelected = date.year == _selectedDate.year &&
                 date.month == _selectedDate.month &&
                 date.day == _selectedDate.day;
 
             final now = DateTime.now();
-            final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
+            final isToday = date.year == now.year &&
+                date.month == now.month &&
+                date.day == now.day;
 
             // Jumlah petugas piket di hari ini
-            final scheds = ronda.getSchedulesForDate(date).where((s) => !s.isLibur).toList();
-            final hasPiket = scheds.isNotEmpty;
+            final scheds = ronda
+                .getSchedulesForDate(date)
+                .where((s) => !s.isLibur)
+                .toList();
+            final hasEligibleSwap = scheds.any((s) => now
+                .isBefore(s.startDateTime.subtract(const Duration(hours: 3))));
+            final hasPiket = widget.mode == CalendarDialogMode.officerSwap
+                ? hasEligibleSwap
+                : scheds.isNotEmpty;
 
             return InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: () => setState(() => _selectedDate = date),
+              onTap: widget.mode == CalendarDialogMode.officerSwap &&
+                      !hasEligibleSwap
+                  ? null
+                  : () => setState(() {
+                        _selectedDate = date;
+                        _selectedColleagueSchedule = null;
+                      }),
               child: Container(
                 decoration: BoxDecoration(
                   color: isSelected
                       ? AppColors.primaryLight
-                      : (isToday ? AppColors.secondaryContainer.withValues(alpha: 0.5) : null),
+                      : (isToday
+                          ? AppColors.secondaryContainer.withValues(alpha: 0.5)
+                          : null),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: isSelected
                         ? AppColors.primaryLight
-                        : (isToday ? AppColors.secondary : Colors.grey.shade300),
+                        : (isToday
+                            ? AppColors.secondary
+                            : Colors.grey.shade300),
                     width: isSelected || isToday ? 1.5 : 1,
                   ),
                 ),
@@ -286,7 +339,9 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : (isToday ? AppColors.secondary : null),
+                        color: isSelected
+                            ? Colors.white
+                            : (isToday ? AppColors.secondary : null),
                       ),
                     ),
                     if (hasPiket)
@@ -298,7 +353,9 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
                             height: 5,
                             margin: const EdgeInsets.only(top: 2),
                             decoration: BoxDecoration(
-                              color: isSelected ? Colors.amberAccent : AppColors.patrolAccent,
+                              color: isSelected
+                                  ? Colors.amberAccent
+                                  : AppColors.patrolAccent,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -309,7 +366,9 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
                               height: 5,
                               margin: const EdgeInsets.only(top: 2),
                               decoration: BoxDecoration(
-                                color: isSelected ? Colors.lightGreenAccent : AppColors.verified,
+                                color: isSelected
+                                    ? Colors.lightGreenAccent
+                                    : AppColors.verified,
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -359,12 +418,14 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
             ...schedulesForDay.map(
               (s) => Container(
                 margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: s.isLibur ? Colors.grey.shade100 : Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: s.isLibur ? Colors.grey.shade300 : Colors.blue.shade200,
+                    color:
+                        s.isLibur ? Colors.grey.shade300 : Colors.blue.shade200,
                   ),
                 ),
                 child: Row(
@@ -378,7 +439,8 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
                     Expanded(
                       child: Text(
                         '${s.petugasName} - ${s.shiftName}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                     ),
                     Text(
@@ -410,7 +472,10 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
               border: OutlineInputBorder(),
             ),
             items: officers
-                .map((o) => DropdownMenuItem(value: o.id, child: Text(o.namaLengkap, style: const TextStyle(fontSize: 13))))
+                .map((o) => DropdownMenuItem(
+                    value: o.id,
+                    child: Text(o.namaLengkap,
+                        style: const TextStyle(fontSize: 13))))
                 .toList(),
             onChanged: (val) {
               if (val != null) setState(() => _selectedOfficerId = val);
@@ -429,14 +494,16 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
             items: _shiftPresets
                 .map((p) => DropdownMenuItem(
                       value: p['name'],
-                      child: Text(p['name']!, style: const TextStyle(fontSize: 12)),
+                      child: Text(p['name']!,
+                          style: const TextStyle(fontSize: 12)),
                     ))
                 .toList(),
             onChanged: _isLibur
                 ? null
                 : (val) {
                     if (val != null) {
-                      final preset = _shiftPresets.firstWhere((p) => p['name'] == val);
+                      final preset =
+                          _shiftPresets.firstWhere((p) => p['name'] == val);
                       setState(() {
                         _selectedShiftName = val;
                         _jamMulai = preset['start']!;
@@ -447,7 +514,8 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
           ),
           const SizedBox(height: 6),
           SwitchListTile(
-            title: const Text('Tetapkan Hari Libur / Istirahat', style: TextStyle(fontSize: 12)),
+            title: const Text('Tetapkan Hari Libur / Istirahat',
+                style: TextStyle(fontSize: 12)),
             value: _isLibur,
             contentPadding: EdgeInsets.zero,
             onChanged: (val) {
@@ -469,23 +537,28 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
-              onPressed: () {
-                if (_selectedOfficerId == null) return;
-                ronda.assignScheduleManual(
-                  userId: _selectedOfficerId!,
-                  date: _selectedDate,
-                  shiftName: _selectedShiftName,
-                  jamMulai: _jamMulai,
-                  jamSelesai: _jamSelesai,
-                  isLibur: _isLibur,
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Jadwal berhasil ditugaskan!')),
-                );
-              },
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primaryLight),
+              onPressed: _isSubmittingSwap
+                  ? null
+                  : () async {
+                      if (_selectedOfficerId == null) return;
+                      ronda.assignScheduleManual(
+                        userId: _selectedOfficerId!,
+                        date: _selectedDate,
+                        shiftName: _selectedShiftName,
+                        jamMulai: _jamMulai,
+                        jamSelesai: _jamSelesai,
+                        isLibur: _isLibur,
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Jadwal berhasil ditugaskan!')),
+                      );
+                    },
               icon: const Icon(Icons.check, size: 16),
-              label: const Text('Simpan Penugasan Jadwal', style: TextStyle(fontSize: 13)),
+              label: const Text('Simpan Penugasan Jadwal',
+                  style: TextStyle(fontSize: 13)),
             ),
           ),
         ],
@@ -499,10 +572,15 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
     RondaProvider ronda,
     List<PatrolSchedule> mySchedules,
     List<PatrolSchedule> schedulesForDay,
+    PatrolSchedule? selectedMySchedule,
   ) {
     final currentUser = ronda.currentUser;
     final colleagueSchedulesOnDay = schedulesForDay
-        .where((s) => s.userId != currentUser?.id && !s.isLibur)
+        .where((s) =>
+            s.userId != currentUser?.id &&
+            !s.isLibur &&
+            DateTime.now()
+                .isBefore(s.startDateTime.subtract(const Duration(hours: 3))))
         .toList();
 
     return SingleChildScrollView(
@@ -518,14 +596,19 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
           if (mySchedules.isEmpty)
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(8)),
-              child: const Text('Anda tidak memiliki jadwal dinas mendatang untuk ditukar.', style: TextStyle(fontSize: 11)),
+              decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(8)),
+              child: const Text(
+                  'Anda tidak memiliki jadwal dinas mendatang untuk ditukar.',
+                  style: TextStyle(fontSize: 11)),
             )
           else
             DropdownButtonFormField<String>(
-              initialValue: _selectedMySchedule?.id ?? mySchedules.first.id,
+              initialValue: selectedMySchedule?.id ?? mySchedules.first.id,
               isExpanded: true,
-              decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                  isDense: true, border: OutlineInputBorder()),
               items: mySchedules
                   .map((s) => DropdownMenuItem(
                         value: s.id,
@@ -538,7 +621,8 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
               onChanged: (val) {
                 if (val != null) {
                   setState(() {
-                    _selectedMySchedule = mySchedules.firstWhere((s) => s.id == val);
+                    _selectedMySchedule =
+                        mySchedules.firstWhere((s) => s.id == val);
                   });
                 }
               },
@@ -555,8 +639,12 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
-              child: const Text('Tidak ada rekan yang bertugas pada tanggal ini.', style: TextStyle(fontSize: 11)),
+              decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8)),
+              child: const Text(
+                  'Tidak ada rekan yang bertugas pada tanggal ini.',
+                  style: TextStyle(fontSize: 11)),
             )
           else
             ...colleagueSchedulesOnDay.map((s) {
@@ -565,19 +653,26 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
                 onTap: () => setState(() => _selectedColleagueSchedule = s),
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isChosen ? AppColors.patrolAccentLight : Colors.grey.shade50,
+                    color: isChosen
+                        ? AppColors.patrolAccentLight
+                        : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: isChosen ? AppColors.patrolAccent : Colors.grey.shade300,
+                      color: isChosen
+                          ? AppColors.patrolAccent
+                          : Colors.grey.shade300,
                       width: isChosen ? 1.5 : 1,
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        isChosen ? Icons.check_circle : Icons.radio_button_unchecked,
+                        isChosen
+                            ? Icons.check_circle
+                            : Icons.radio_button_unchecked,
                         size: 16,
                         color: isChosen ? AppColors.patrolAccent : Colors.grey,
                       ),
@@ -587,7 +682,8 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
                           '${s.petugasName} (${s.shiftName})',
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: isChosen ? FontWeight.bold : FontWeight.normal,
+                            fontWeight:
+                                isChosen ? FontWeight.bold : FontWeight.normal,
                           ),
                         ),
                       ),
@@ -599,7 +695,8 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
           const SizedBox(height: 10),
 
           // 3. Alasan Pertukaran
-          const Text('3. Alasan Pertukaran:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          const Text('3. Alasan Pertukaran:',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           TextField(
             controller: _swapReasonController,
@@ -617,52 +714,79 @@ class _DynamicRosterCalendarDialogState extends State<DynamicRosterCalendarDialo
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primaryLight),
-              onPressed: () {
-                final mySched = _selectedMySchedule ?? mySchedules.firstOrNull;
-                final targetSched = _selectedColleagueSchedule;
-                final reason = _swapReasonController.text.trim();
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primaryLight),
+              onPressed: _isSubmittingSwap
+                  ? null
+                  : () async {
+                      final mySched =
+                          selectedMySchedule ?? mySchedules.firstOrNull;
+                      final targetSched = _selectedColleagueSchedule;
+                      final reason = _swapReasonController.text.trim();
 
-                if (mySched == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Pilih jadwal Anda terlebih dahulu!')),
-                  );
-                  return;
-                }
-                if (targetSched == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Pilih jadwal rekan yang ingin Anda tukar dari kalender!')),
-                  );
-                  return;
-                }
-                if (reason.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Tuliskan alasan permohonan pertukaran jadwal!')),
-                  );
-                  return;
-                }
+                      if (mySched == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content:
+                                  Text('Pilih jadwal Anda terlebih dahulu!')),
+                        );
+                        return;
+                      }
+                      if (targetSched == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text(
+                                  'Pilih jadwal rekan yang ingin Anda tukar dari kalender!')),
+                        );
+                        return;
+                      }
+                      if (reason.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text(
+                                  'Tuliskan alasan permohonan pertukaran jadwal!')),
+                        );
+                        return;
+                      }
 
-                ronda.requestShiftSwap(
-                  scheduleId: mySched.id,
-                  targetUserId: targetSched.userId,
-                  alasan: reason,
-                  requesterShift: mySched.shiftName,
-                  targetDate: targetSched.tanggalRonda,
-                  targetShift: targetSched.shiftName,
-                );
+                      setState(() => _isSubmittingSwap = true);
+                      final sent = await ronda.requestShiftSwap(
+                        scheduleId: mySched.id,
+                        targetUserId: targetSched.userId,
+                        alasan: reason,
+                        requesterShift: mySched.shiftName,
+                        targetDate: targetSched.tanggalRonda,
+                        targetShift: targetSched.shiftName,
+                      );
 
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Permintaan tukar jadwal terkirim ke ${targetSched.petugasName}! Menunggu persetujuan rekan.',
-                    ),
-                    backgroundColor: AppColors.verified,
-                  ),
-                );
-              },
+                      if (!context.mounted) return;
+                      if (!sent) {
+                        setState(() => _isSubmittingSwap = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ronda.lastErrorMessage ??
+                                'Permintaan gagal dikirim. Coba lagi setelah koneksi tersedia.'),
+                            backgroundColor: AppColors.emergency,
+                          ),
+                        );
+                        return;
+                      }
+
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Permintaan tukar jadwal terkirim ke ${targetSched.petugasName}! Menunggu persetujuan rekan.',
+                          ),
+                          backgroundColor: AppColors.verified,
+                        ),
+                      );
+                    },
               icon: const Icon(Icons.send, size: 16),
-              label: const Text('Kirim Pengajuan Tukar', style: TextStyle(fontSize: 13)),
+              label: _isSubmittingSwap
+                  ? const Text('Mengirim...')
+                  : const Text('Kirim Pengajuan Tukar',
+                      style: TextStyle(fontSize: 13)),
             ),
           ),
         ],

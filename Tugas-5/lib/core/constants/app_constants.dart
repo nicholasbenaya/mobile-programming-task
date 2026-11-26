@@ -8,6 +8,7 @@ class AppConstants {
   static const maxTitleLength = 100;
   static const maxNoteLength = 1000;
   static const photoBucket = 'record-photos';
+  static const rondaPhotoBucket = 'ronda-evidence';
   static const recordsTable = 'records';
 
   /// Deep link untuk kembali ke aplikasi setelah login Google / verifikasi email (HP).

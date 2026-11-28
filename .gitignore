@@ -39,6 +39,19 @@ macos/Flutter/GeneratedPluginRegistrant.swift
 .env
 .env.*
 !.env.example
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Supabase CLI local temp files
+**/supabase/.temp/
+**/supabase/.branches/
+
+# Local personal notes, reports, and unrelated root files
+/CHEATSHEET_PEMROGRAMAN_BERGERAK.md
+/Laporan_Perubahan_Pahlawan_Nasional.pdf
+/Tugas_CNN_Fashion_MNIST.ipynb
+/*.ipynb
+/*.pdf
 
 # OS files
 .DS_Store
